@@ -1,0 +1,23 @@
+version: '3'
+services:
+  openldap:
+    image: osixia/openldap
+    environment:
+      LDAP_DOMAIN: ${DOMAIN}
+      LDAP_ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      LDAP_CONFIG_PASSWORD: ${CONFIG_PASSWORD}
+      LDAP_READONLY_USER: "true"
+      LDAP_READONLY_USER_USERNAME: ${READER_UID}
+      LDAP_READONLY_USER_PASSWORD: ${READER_PASS}
+
+  python:
+    build:
+      dockerfile: Dockerfile-python
+      context: .
+    environment:
+      LDAP_DOMAIN: ${DOMAIN}
+      LDAP_ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    volumes:
+      - ..:/work
+    links:
+      - openldap:ldap

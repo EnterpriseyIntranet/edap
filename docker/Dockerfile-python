@@ -1,0 +1,13 @@
+FROM python
+
+RUN true \
+	&& apt-get update \
+	&& apt-get install -y libsasl2-dev python-dev libldap2-dev libssl-dev \
+	&& apt-get clean \
+	&& true
+
+RUN pip install python-ldap pytest
+
+WORKDIR /work
+
+CMD ["py.test", "test.py"]
