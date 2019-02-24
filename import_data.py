@@ -1,8 +1,6 @@
 import re
 import collections
 
-import edap
-
 
 def get_memberships_from_groups(all_users, groups):
     """
@@ -89,8 +87,8 @@ def name2uid(name):
     return re.sub(r"@.*", "", name)
 
 
-def make_user_from_dict(bound_ldap, dic):
+def make_user_from_dict(edap_obj, dic):
     """
     Make a LDAP user entry given a dictionary with "uid", "givenName" and "sn" members.
     """
-    return edap.add_user(bound_ldap, dic["uid"], dic["givenName"], dic["sn"], "foobar")
+    return edap_obj.add_user(dic["uid"], dic["givenName"], dic["sn"], "foobar")

@@ -21,177 +21,6 @@ def _hashPassword(password):
     return hashed
 
 
-def mk_add_user_modlist(uid, name, surname, password):
-    mail = f"{uid}@example.com".encode("ASCII")
-    dic = dict(
-         uid=uid.encode("ASCII"), givenName=name.encode("UTF-8"),
-         mail=mail, objectclass=(b"inetOrgPerson", b"top"),
-         sn=surname.encode("UTF-8"), userPassword=_hashPassword(password),
-         cn=f"{name} {surname}".encode("UTF-8"),
-    )
-    modlist = ldap.modlist.addModlist(dic)
-    return modlist
-
-
-def object_exists(bound_ldap, search, obj_class=None):
-    if obj_class is not None:
-        search = f"&({search})(objectClass={obj_class})"
-    found = bound_ldap.search_s(bound_ldap.BASE_DN, ldap.SCOPE_SUBTREE, f"({search})")
-    return len(found)
-
-
-def subobject_exists_at(bound_ldap, relative_pos, obj_class, additional_search=None):
-    root = f"{relative_pos},{bound_ldap.BASE_DN}"
-    return object_exists_at(bound_ldap, root, obj_class, additional_search)
-
-
-def object_exists_at(bound_ldap, root, obj_class, additional_search=None):
-    search = f"objectClass={obj_class}"
-    if additional_search is not None:
-        search = f"&({search})({additional_search})"
-    try:
-        found = bound_ldap.search_s(root, ldap.SCOPE_BASE, f"({search})")
-    except Exception:
-        return 0
-    return len(found)
-
-
-def create_org_unit(bound_ldap, name, fqdn):
-    dic = dict(
-         ou=name.encode("ASCII"),
-         objectclass=(b"organizationalUnit", b"top"),
-    )
-    modlist = ldap.modlist.addModlist(dic)
-    bound_ldap.add_s(fqdn, modlist)
-
-
-def uid_is_member_of_group(bound_ldap, group_fqdn, uid):
-    search = f"memberUid={uid}"
-    found = bound_ldap.search_s(group_fqdn, ldap.SCOPE_BASE, f"({search})")
-    return len(found)
-
-
-def create_group_dict(name):
-    dic = dict(
-        cn=name.encode("ASCII"), objectclass=(b"posixGroup", b"top"), gidNumber=b"500",
-    )
-    return dic
-
-
-def create_group_from_dict(bound_ldap, fqdn, dic):
-    modlist = ldap.modlist.addModlist(dic)
-    bound_ldap.add_s(fqdn, modlist)
-
-
-def add_user(bound_ldap, uid, name, surname, password):
-    if subobject_exists_at(bound_ldap, "ou=people", "organizationalUnit") == 0:
-        raise ConstraintError(f"The people group '{bound_ldap.PEOPLE_GROUP}' doesn't exist.")
-    if user_of_uid_exists(bound_ldap, uid) > 0:
-        raise ConstraintError(f"User of uid '{uid}' already exists.")
-    modlist = mk_add_user_modlist(uid, name, surname, password)
-    bound_ldap.add_s(f"uid={uid},{bound_ldap.PEOPLE_GROUP}", modlist)
-
-
-def user_of_uid_exists(bound_ldap, uid):
-    if subobject_exists_at(bound_ldap, "ou=people", "organizationalUnit") == 0:
-        raise ConstraintError(f"The people group '{bound_ldap.PEOPLE_GROUP}' doesn't exist.")
-    found = bound_ldap.search_s(f"{bound_ldap.PEOPLE_GROUP}", ldap.SCOPE_ONELEVEL, f"(uid={uid})")
-    return len(found)
-
-
-def create_division(bound_ldap, name):
-    if not subobject_exists_at(bound_ldap, bound_ldap.DIVISIONS, "organizationalUnit"):
-        create_org_unit(bound_ldap, bound_ldap.DIVISIONS, bound_ldap.DIVISIONS_GROUP)
-    if not subobject_exists_at(bound_ldap, f"cn={name},{bound_ldap.DIVISIONS}", "posixGroup"):
-        dic = create_group_dict(f"{name}")
-        create_group_from_dict(bound_ldap, f"cn={name},{bound_ldap.DIVISIONS_GROUP}", dic)
-
-
-def create_service_group(bound_ldap, name):
-    if not subobject_exists_at(bound_ldap, bound_ldap.SERVICES, "organizationalUnit"):
-        create_org_unit(bound_ldap, bound_ldap.SERVICES, bound_ldap.SERVICES_GROUP)
-    if not subobject_exists_at(bound_ldap, f"cn={name},{bound_ldap.SERVICES}", "posixGroup"):
-        dic = create_group_dict(f"{name}")
-        create_group_from_dict(bound_ldap, f"cn={name},{bound_ldap.SERVICES_GROUP}", dic)
-
-
-def make_uid_member_of(bound_ldap, uid, group_fqdn):
-    if object_exists_at(bound_ldap, group_fqdn, "posixGroup") == 0:
-        raise ConstraintError(f"Group {group_fqdn} doesn't exist.")
-    if user_of_uid_exists(bound_ldap, uid) == 0:
-        msg = f"User of uid '{uid}' doesn't exist, so we can't add it to any group."
-        raise ConstraintError(msg)
-    if uid_is_member_of_group(bound_ldap, group_fqdn, uid):
-        return
-    modlist = [(ldap.MOD_ADD, "memberUid", [uid.encode("ASCII")])]
-    bound_ldap.modify_s(group_fqdn, modlist)
-
-
-def make_uid_member_of_division(bound_ldap, uid, name):
-    group_fqdn = f"cn={name},{bound_ldap.DIVISIONS_GROUP}"
-    return make_uid_member_of(bound_ldap, uid, group_fqdn)
-
-
-def make_uid_member_of_service_group(bound_ldap, uid, name):
-    group_fqdn = f"cn={name},{bound_ldap.SERVICES_GROUP}"
-    return make_uid_member_of(bound_ldap, uid, group_fqdn)
-
-
-def remove_uid_member_of(bound_ldap, uid, group_fqdn):
-    if object_exists_at(bound_ldap, group_fqdn, "posixGroup") == 0:
-        raise ConstraintError(f"Group {group_fqdn} doesn't exist.")
-    if not uid_is_member_of_group(bound_ldap, group_fqdn, uid):
-        return
-    if user_of_uid_exists(bound_ldap, uid) == 0:
-        msg = f"User of uid '{uid}' doesn't exist, so we can't add it to any group."
-        raise ConstraintError(msg)
-    modlist = [(ldap.MOD_DELETE, "memberUid", [uid.encode("ASCII")])]
-    bound_ldap.modify_s(group_fqdn, modlist)
-
-
-def remove_uid_member_of_division(bound_ldap, uid, name):
-    group_fqdn = f"cn={name},{bound_ldap.DIVISIONS_GROUP}"
-    return remove_uid_member_of(bound_ldap, uid, group_fqdn)
-
-
-def remove_uid_member_of_service_group(bound_ldap, uid, name):
-    group_fqdn = f"cn={name},{bound_ldap.SERVICES_GROUP}"
-    return remove_uid_member_of(bound_ldap, uid, group_fqdn)
-
-
-def create_franchise(bound_ldap, name):
-    if not subobject_exists_at(bound_ldap, bound_ldap.FRANCHISES, "organizationalUnit"):
-        create_org_unit(bound_ldap, bound_ldap.FRANCHISES, bound_ldap.FRANCHISES_GROUP)
-    if not subobject_exists_at(bound_ldap, f"cn={name},{bound_ldap.FRANCHISES}", "posixGroup"):
-        dic = create_group_dict(f"{name}")
-        dic["description"] = label_franchise(name).encode("UTF-8")
-        create_group_from_dict(bound_ldap, f"cn={name},{bound_ldap.FRANCHISES_GROUP}", dic)
-
-
-def label_franchise(name):
-    for code, country_name in c.COUNTRIES_CODES.items():
-        if name.startswith(code):
-            return country_name
-    raise KeyError(f"Invalid country code to match '{name}'")
-
-
-def create_all_divisions(bound_ldap, source):
-    for dname in source:
-        create_division(bound_ldap, dname)
-
-
-def create_all_franchises(bound_ldap, source):
-    for frname in source:
-        create_franchise(bound_ldap, frname)
-
-
-def ensure_org_sanity(bound_ldap, source):
-    create_all_divisions(bound_ldap, source["divisions"])
-    create_all_franchises(bound_ldap, source["countries"])
-    create_org_unit(bound_ldap, "people", bound_ldap.PEOPLE_GROUP)
-    create_org_unit(bound_ldap, "people", bound_ldap.PEOPLE_GROUP)
-
-
 class BoundLdap(object):
     def __init__(self, hostname, admin_cn, password, domain=None):
 
@@ -213,14 +42,181 @@ class BoundLdap(object):
         self.SERVICES = "ou=services"
         self.SERVICES_GROUP = f"{self.SERVICES},{self.BASE_DN}"
 
-    def add_s(self, * args, ** kwargs):
-        return self.ldap.add_s(* args, ** kwargs)
+    def add_s(self, *args, **kwargs):
+        return self.ldap.add_s(*args, **kwargs)
 
-    def modify_s(self, * args, ** kwargs):
-        return self.ldap.modify_s(* args, ** kwargs)
+    def modify_s(self, *args, **kwargs):
+        return self.ldap.modify_s(*args, **kwargs)
 
-    def search_s(self, * args, ** kwargs):
-        return self.ldap.search_s(* args, ** kwargs)
+    def search_s(self, *args, **kwargs):
+        return self.ldap.search_s(*args, **kwargs)
+
+    def unbind_s(self):
+        return self.ldap.unbind_s()
+
+
+class LdapObjectsMixin(object):
+
+    def object_exists(self, search, obj_class=None):
+        if obj_class is not None:
+            search = f"&({search})(objectClass={obj_class})"
+        found = self.ldap.search_s(self.ldap.BASE_DN, ldap.SCOPE_SUBTREE, f"({search})")
+        return len(found)
+
+    def object_exists_at(self, root, obj_class, additional_search=None):
+        search = f"objectClass={obj_class}"
+        if additional_search is not None:
+            search = f"&({search})({additional_search})"
+        try:
+            found = self.ldap.search_s(root, ldap.SCOPE_BASE, f"({search})")
+        except Exception:
+            return 0
+        return len(found)
+
+    def subobject_exists_at(self, relative_pos, obj_class, additional_search=None):
+        root = f"{relative_pos},{self.ldap.BASE_DN}"
+        return self.object_exists_at(root, obj_class, additional_search)
+
+
+class LdapGroupMixin(object):
+
+    def create_org_unit(self, name, fqdn):
+        dic = dict(
+             ou=name.encode("ASCII"),
+             objectclass=(b"organizationalUnit", b"top"),
+        )
+        modlist = ldap.modlist.addModlist(dic)
+        self.ldap.add_s(fqdn, modlist)
+
+    def create_group_dict(self, name):
+        dic = dict(
+            cn=name.encode("ASCII"), objectclass=(b"posixGroup", b"top"), gidNumber=b"500",
+        )
+        return dic
+
+    def create_group_from_dict(self, fqdn, dic):
+        modlist = ldap.modlist.addModlist(dic)
+        self.ldap.add_s(fqdn, modlist)
+
+    def create_service_group(self, name):
+        if not self.subobject_exists_at(self.ldap.SERVICES, "organizationalUnit"):
+            self.create_org_unit(self.ldap.SERVICES, self.ldap.SERVICES_GROUP)
+        if not self.subobject_exists_at(f"cn={name},{self.ldap.SERVICES}", "posixGroup"):
+            dic = self.create_group_dict(f"{name}")
+            self.create_group_from_dict(f"cn={name},{self.ldap.SERVICES_GROUP}", dic)
+
+
+class LdapUserMixin(object):
+
+    def add_user(self, uid, name, surname, password):
+        if self.subobject_exists_at("ou=people", "organizationalUnit") == 0:
+            raise ConstraintError(f"The people group '{self.ldap.PEOPLE_GROUP}' doesn't exist.")
+        if self.user_of_uid_exists(uid) > 0:
+            raise ConstraintError(f"User of uid '{uid}' already exists.")
+        modlist = self.mk_add_user_modlist(uid, name, surname, password)
+        self.ldap.add_s(f"uid={uid},{self.ldap.PEOPLE_GROUP}", modlist)
+
+    def mk_add_user_modlist(self, uid, name, surname, password):
+        mail = f"{uid}@example.com".encode("ASCII")
+        dic = dict(
+            uid=uid.encode("ASCII"), givenName=name.encode("UTF-8"),
+            mail=mail, objectclass=(b"inetOrgPerson", b"top"),
+            sn=surname.encode("UTF-8"), userPassword=_hashPassword(password),
+            cn=f"{name} {surname}".encode("UTF-8"),
+        )
+        modlist = ldap.modlist.addModlist(dic)
+        return modlist
+
+    def user_of_uid_exists(self, uid):
+        if self.subobject_exists_at("ou=people", "organizationalUnit") == 0:
+            raise ConstraintError(f"The people group '{self.ldap.PEOPLE_GROUP}' doesn't exist.")
+        found = self.ldap.search_s(f"{self.ldap.PEOPLE_GROUP}", ldap.SCOPE_ONELEVEL, f"(uid={uid})")
+        return len(found)
+
+    def uid_is_member_of_group(self, group_fqdn, uid):
+        search = f"memberUid={uid}"
+        found = self.ldap.search_s(group_fqdn, ldap.SCOPE_BASE, f"({search})")
+        return len(found)
+
+    def make_uid_member_of(self, uid, group_fqdn):
+        if self.object_exists_at(group_fqdn, "posixGroup") == 0:
+            raise ConstraintError(f"Group {group_fqdn} doesn't exist.")
+        if self.user_of_uid_exists(uid) == 0:
+            msg = f"User of uid '{uid}' doesn't exist, so we can't add it to any group."
+            raise ConstraintError(msg)
+        if self.uid_is_member_of_group(group_fqdn, uid):
+            return
+        modlist = [(ldap.MOD_ADD, "memberUid", [uid.encode("ASCII")])]
+        self.ldap.modify_s(group_fqdn, modlist)
+
+    def make_uid_member_of_division(self, uid, name):
+        group_fqdn = f"cn={name},{self.ldap.DIVISIONS_GROUP}"
+        return self.make_uid_member_of(uid, group_fqdn)
+
+    def make_uid_member_of_service_group(self, uid, name):
+        group_fqdn = f"cn={name},{self.ldap.SERVICES_GROUP}"
+        return self.make_uid_member_of(uid, group_fqdn)
+
+    def remove_uid_member_of(self, uid, group_fqdn):
+        if self.object_exists_at(group_fqdn, "posixGroup") == 0:
+            raise ConstraintError(f"Group {group_fqdn} doesn't exist.")
+        if not self.uid_is_member_of_group(group_fqdn, uid):
+            return
+        if self.user_of_uid_exists(uid) == 0:
+            msg = f"User of uid '{uid}' doesn't exist, so we can't add it to any group."
+            raise ConstraintError(msg)
+        modlist = [(ldap.MOD_DELETE, "memberUid", [uid.encode("ASCII")])]
+        self.ldap.modify_s(group_fqdn, modlist)
+
+    def remove_uid_member_of_division(self, uid, name):
+        group_fqdn = f"cn={name},{self.ldap.DIVISIONS_GROUP}"
+        return self.remove_uid_member_of(uid, group_fqdn)
+
+    def remove_uid_member_of_service_group(self, uid, name):
+        group_fqdn = f"cn={name},{self.ldap.SERVICES_GROUP}"
+        return self.remove_uid_member_of(uid, group_fqdn)
+
+
+class LdapFranchiseMixin(object):
+
+    def create_franchise(self, name):
+        if not self.subobject_exists_at(self.ldap.FRANCHISES, "organizationalUnit"):
+            self.create_org_unit(self.ldap.FRANCHISES, self.ldap.FRANCHISES_GROUP)
+        if not self.subobject_exists_at(f"cn={name},{self.ldap.FRANCHISES}", "posixGroup"):
+            dic = self.create_group_dict(f"{name}")
+            dic["description"] = self.label_franchise(name).encode("UTF-8")
+            self.create_group_from_dict(f"cn={name},{self.ldap.FRANCHISES_GROUP}", dic)
+
+    def label_franchise(self, name):
+        for code, country_name in c.COUNTRIES_CODES.items():
+            if name.startswith(code):
+                return country_name
+        raise KeyError(f"Invalid country code to match '{name}'")
+
+    def create_all_franchises(self, source):
+        for frname in source:
+            self.create_franchise(frname)
+
+
+class LdapDivisionMixin(object):
+
+    def create_division(self, name):
+        if not self.subobject_exists_at(self.ldap.DIVISIONS, "organizationalUnit"):
+            self.create_org_unit(self.ldap.DIVISIONS, self.ldap.DIVISIONS_GROUP)
+        if not self.subobject_exists_at(f"cn={name},{self.ldap.DIVISIONS}", "posixGroup"):
+            dic = self.create_group_dict(f"{name}")
+            self.create_group_from_dict(f"cn={name},{self.ldap.DIVISIONS_GROUP}", dic)
+
+    def create_all_divisions(self, source):
+        for dname in source:
+            self.create_division(dname)
+
+
+def ensure_org_sanity(edap, source):
+    edap.create_all_divisions(source["divisions"])
+    edap.create_all_franchises(source["countries"])
+    edap.create_org_unit("people", edap.ldap.PEOPLE_GROUP)
+    edap.create_org_unit("people", edap.ldap.PEOPLE_GROUP)
 
 
 def update_parser(parser=None):
@@ -232,8 +228,15 @@ def update_parser(parser=None):
     return parser
 
 
+class Edap(LdapObjectsMixin, LdapGroupMixin, LdapUserMixin, LdapFranchiseMixin, LdapDivisionMixin):
+
+    def __init__(self, bound_ldap):
+        self.ldap = bound_ldap
+
+
 if __name__ == "__main__":
     parser = update_parser()
     args = parser.parse_args()
 
     ld = BoundLdap(args.hostname, args.admin_dn, args.password)
+    edap = Edap(bound_ldap=ld)
