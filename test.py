@@ -3,7 +3,7 @@ import collections
 
 import pytest
 
-from edap import Edap, BoundLdap, ConstraintError
+from edap import Edap, ConstraintError
 import import_data
 
 DOMAIN = os.environ.get("DOMAIN")
@@ -13,8 +13,7 @@ ADMIN_PASSWORD = os.environ.get("LDAP_ADMIN_PASSWORD")
 
 @pytest.fixture(scope="session")
 def edap():
-    bound_ldap = BoundLdap("ldap", ADMIN_CN, ADMIN_PASSWORD, DOMAIN)
-    edap = Edap(bound_ldap=bound_ldap)
+    edap = Edap("ldap", ADMIN_CN, ADMIN_PASSWORD, DOMAIN)
     print(ADMIN_CN, ADMIN_PASSWORD)
     yield edap
     edap.ldap.unbind_s()
@@ -55,7 +54,7 @@ def test_assign_membership():
 
 def test_blank(edap):
     assert not edap.subobject_exists_at(f"ou=people", "organizationalUnit")
-    edap.create_org_unit("people", edap.ldap.PEOPLE_GROUP)
+    edap.create_org_unit("people", edap.PEOPLE_GROUP)
     assert edap.subobject_exists_at("ou=people", "organizationalUnit",)
     assert not edap.subobject_exists_at("ou=people", "foobar")
 
@@ -68,18 +67,18 @@ def test_user_becomes_present(edap):
 
 def test_divisions_becomes_present(edap):
     assert not edap.subobject_exists_at("ou=divisions", "organizationalUnit")
-    edap.create_org_unit("ou=divisions", edap.ldap.DIVISIONS_GROUP)
+    edap.create_org_unit("ou=divisions", edap.DIVISIONS_GROUP)
     assert edap.subobject_exists_at("ou=divisions", "organizationalUnit")
 
 
 def test_it_division_becomes_present(edap):
-    assert not edap.object_exists_at(f"cn=it,{edap.ldap.DIVISIONS_GROUP}", "posixGroup")
+    assert not edap.object_exists_at(f"cn=it,{edap.DIVISIONS_GROUP}", "posixGroup")
     edap.create_division("it")
-    assert edap.object_exists_at(f"cn=it,{edap.ldap.DIVISIONS_GROUP}", "posixGroup")
+    assert edap.object_exists_at(f"cn=it,{edap.DIVISIONS_GROUP}", "posixGroup")
 
 
 def test_new_it_guy(edap):
-    it_group_dn = f"cn=it,{edap.ldap.DIVISIONS_GROUP}"
+    it_group_dn = f"cn=it,{edap.DIVISIONS_GROUP}"
     assert not edap.uid_is_member_of_group(it_group_dn, "kohout")
 
     edap.make_uid_member_of("kohout", it_group_dn)
@@ -102,9 +101,9 @@ def test_new_it_guy(edap):
 
 
 def test_czech_franchise_becomes_present(edap):
-    assert not edap.subobject_exists_at(f"cn=cz_prg,{edap.ldap.FRANCHISES}", "posixGroup")
+    assert not edap.subobject_exists_at(f"cn=cz_prg,{edap.FRANCHISES}", "posixGroup")
     edap.create_franchise("cz_prg")
-    assert edap.subobject_exists_at(f"cn=cz_prg,{edap.ldap.FRANCHISES}", "posixGroup")
+    assert edap.subobject_exists_at(f"cn=cz_prg,{edap.FRANCHISES}", "posixGroup")
     assert edap.object_exists(f"&(commonName=cz_prg)(description=Czech Republic)", "posixGroup")
 
 
