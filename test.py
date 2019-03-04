@@ -66,9 +66,9 @@ def test_user_becomes_present(edap):
 
 
 def test_divisions_becomes_present(edap):
-    assert not edap.subobject_exists_at("ou=divisions", "organizationalUnit")
+    assert not edap.org_unit_exists("divisions")
     edap.create_org_unit("ou=divisions", edap.DIVISIONS_GROUP)
-    assert edap.subobject_exists_at("ou=divisions", "organizationalUnit")
+    assert edap.org_unit_exists("divisions")
 
 
 def test_it_division_becomes_present(edap):

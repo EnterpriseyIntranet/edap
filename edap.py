@@ -44,34 +44,6 @@ class LdapObjectsMixin(object):
         return self.object_exists_at(root, obj_class, additional_search)
 
 
-class LdapGroupMixin(object):
-
-    def create_org_unit(self, name, fqdn):
-        dic = dict(
-             ou=name.encode("ASCII"),
-             objectclass=(b"organizationalUnit", b"top"),
-        )
-        modlist = ldap.modlist.addModlist(dic)
-        self.add_s(fqdn, modlist)
-
-    def create_group_dict(self, name):
-        dic = dict(
-            cn=name.encode("ASCII"), objectclass=(b"posixGroup", b"top"), gidNumber=b"500",
-        )
-        return dic
-
-    def create_group_from_dict(self, fqdn, dic):
-        modlist = ldap.modlist.addModlist(dic)
-        self.add_s(fqdn, modlist)
-
-    def create_service_group(self, name):
-        if not self.subobject_exists_at(self.SERVICES, "organizationalUnit"):
-            self.create_org_unit(self.SERVICES, self.SERVICES_GROUP)
-        if not self.subobject_exists_at(f"cn={name},{self.SERVICES}", "posixGroup"):
-            dic = self.create_group_dict(f"{name}")
-            self.create_group_from_dict(f"cn={name},{self.SERVICES_GROUP}", dic)
-
-
 class LdapUserMixin(object):
 
     def add_user(self, uid, name, surname, password):
@@ -143,15 +115,68 @@ class LdapUserMixin(object):
         return self.remove_uid_member_of(uid, group_fqdn)
 
 
+class OrganizationalUnitMixin(object):
+
+    def create_org_unit(self, name, fqdn):
+        dic = dict(
+             ou=name.encode("ASCII"),
+             objectclass=(b"organizationalUnit", b"top"),
+        )
+        modlist = ldap.modlist.addModlist(dic)
+        self.add_s(fqdn, modlist)
+
+    def org_unit_exists(self, organizational_unit):
+        return self.subobject_exists_at(f"ou={organizational_unit}", "organizationalUnit")
+
+
+class LdapGroupMixin(object):
+
+    def create_group(self, name, organizational_unit, description=None):
+        org_unit = f"ou={organizational_unit}"
+        if not self.org_unit_exists(organizational_unit):
+            self.create_org_unit(org_unit, f"{org_unit},{self.BASE_DN}")
+        if self.group_exists(name, organizational_unit):
+            raise RuntimeError("Group with such name under this organizational unit already exists")
+        dic = self.create_group_dict(f"{name}")
+        if description:
+            dic['description'] = description
+        return self.create_group_from_dict(f"cn={name},{org_unit},{self.BASE_DN}", dic)
+
+    def create_group_dict(self, name):
+        dic = dict(
+            cn=name.encode("ASCII"), objectclass=(b"posixGroup", b"top"), gidNumber=b"500",
+        )
+        return dic
+
+    def create_group_from_dict(self, fqdn, dic):
+        modlist = ldap.modlist.addModlist(dic)
+        return self.add_s(fqdn, modlist)
+
+    def group_exists(self, name, organizational_unit):
+        return self.subobject_exists_at(f"cn={name},ou={organizational_unit}", "posixGroup")
+
+
+class LdapServiceMixin(object):
+
+    def create_service(self, name):
+        return self.create_group(name=name, organizational_unit="services")
+
+
+class LdapDivisionMixin(object):
+
+    def create_division(self, name):
+        return self.create_group(name=name, organizational_unit="divisions")
+
+    def create_all_divisions(self, source):
+        for dname in source:
+            self.create_division(dname)
+
+
 class LdapFranchiseMixin(object):
 
     def create_franchise(self, name):
-        if not self.subobject_exists_at(self.FRANCHISES, "organizationalUnit"):
-            self.create_org_unit(self.FRANCHISES, self.FRANCHISES_GROUP)
-        if not self.subobject_exists_at(f"cn={name},{self.FRANCHISES}", "posixGroup"):
-            dic = self.create_group_dict(f"{name}")
-            dic["description"] = self.label_franchise(name).encode("UTF-8")
-            self.create_group_from_dict(f"cn={name},{self.FRANCHISES_GROUP}", dic)
+        description = self.label_franchise(name).encode("UTF-8")
+        return self.create_group(name, "franchises", description=description)
 
     def label_franchise(self, name):
         for code, country_name in c.COUNTRIES_CODES.items():
@@ -162,20 +187,6 @@ class LdapFranchiseMixin(object):
     def create_all_franchises(self, source):
         for frname in source:
             self.create_franchise(frname)
-
-
-class LdapDivisionMixin(object):
-
-    def create_division(self, name):
-        if not self.subobject_exists_at(self.DIVISIONS, "organizationalUnit"):
-            self.create_org_unit(self.DIVISIONS, self.DIVISIONS_GROUP)
-        if not self.subobject_exists_at(f"cn={name},{self.DIVISIONS}", "posixGroup"):
-            dic = self.create_group_dict(f"{name}")
-            self.create_group_from_dict(f"cn={name},{self.DIVISIONS_GROUP}", dic)
-
-    def create_all_divisions(self, source):
-        for dname in source:
-            self.create_division(dname)
 
 
 def ensure_org_sanity(edap, source):
@@ -194,7 +205,8 @@ def update_parser(parser=None):
     return parser
 
 
-class Edap(LdapObjectsMixin, LdapGroupMixin, LdapUserMixin, LdapFranchiseMixin, LdapDivisionMixin):
+class Edap(LdapObjectsMixin, LdapGroupMixin, OrganizationalUnitMixin, LdapUserMixin,
+           LdapFranchiseMixin, LdapDivisionMixin, LdapServiceMixin):
 
     def __init__(self, hostname, admin_cn, password, domain=None):
         if domain is None:
