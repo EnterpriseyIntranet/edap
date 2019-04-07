@@ -1,10 +1,15 @@
 import os
+import sys
+from os.path import dirname
+from os.path import join
 import collections
 
 import pytest
 
+sys.path.insert(0, join(dirname(__file__), 'src'))
+
 from edap import Edap, ConstraintError
-import import_data
+from edap import import_data
 
 DOMAIN = os.environ.get("DOMAIN")
 ADMIN_CN = "cn=admin"
