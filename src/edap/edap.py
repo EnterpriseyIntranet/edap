@@ -43,6 +43,20 @@ class LdapObjectsMixin(object):
         root = f"{relative_pos},{self.BASE_DN}"
         return self.object_exists_at(root, obj_class, additional_search)
 
+    def get_objects(self, search=None, relative_pos=None, obj_class=None):
+        root = self.BASE_DN
+        if obj_class is not None:
+            if search:
+                search = f"(&({search})(objectClass={obj_class}))"
+            else:
+                search = f"(objectClass={obj_class})"
+        if relative_pos:
+            root = f"{relative_pos},{root}"
+        return self.search_s(root, ldap.SCOPE_SUBTREE, search)
+
+    def get_subobjects(self, relative_pos, search=None, obj_class=None):
+        return self.get_objects(search=search, relative_pos=relative_pos, obj_class=obj_class)
+
 
 class LdapUserMixin(object):
 
@@ -53,6 +67,39 @@ class LdapUserMixin(object):
             raise ConstraintError(f"User of uid '{uid}' already exists.")
         modlist = self.mk_add_user_modlist(uid, name, surname, password)
         self.add_s(f"uid={uid},{self.PEOPLE_GROUP}", modlist)
+
+    def get_users(self, search=None):
+        """
+        Get subobjects of organizational unit "people"
+
+        Args:
+            search (str): search filter
+
+        Returns:
+        """
+        return self.get_subobjects('ou=people', search, obj_class='inetOrgPerson')
+
+    def get_user(self, uid):
+        """
+        Search in subobjects of organizational unit "people" by uid
+        Args:
+            uid (str):
+
+        Returns:
+        """
+        return self.get_users(search=f"uid={uid}")
+
+    def get_user_groups(self, uid):
+        """
+        Get groups where user is a member
+
+        Args:
+            uid (str): user id
+
+        Returns (list):
+        """
+        search = f"(&(memberUid={uid})(objectClass=posixGroup))"
+        return self.search_s(self.BASE_DN, ldap.SCOPE_SUBTREE, search)
 
     def mk_add_user_modlist(self, uid, name, surname, password):
         mail = f"{uid}@example.com".encode("ASCII")
@@ -125,6 +172,9 @@ class OrganizationalUnitMixin(object):
         modlist = ldap.modlist.addModlist(dic)
         self.add_s(fqdn, modlist)
 
+    def get_org_unit(self, organizational_unit):
+        return self.get_objects(search=f'ou={organizational_unit}')
+
     def org_unit_exists(self, organizational_unit):
         return self.subobject_exists_at(f"ou={organizational_unit}", "organizationalUnit")
 
@@ -141,6 +191,28 @@ class LdapGroupMixin(object):
         if description:
             dic['description'] = description
         return self.create_group_from_dict(f"cn={name},{org_unit},{self.BASE_DN}", dic)
+
+    def get_groups(self, search=None, organizational_unit=None):
+        """
+        Get objects with object class "posixGroup"
+
+        Args:
+            search (str): search filter
+
+        Returns (list):
+        """
+        relative_pos = f"ou={organizational_unit}" if organizational_unit else None
+        return self.get_objects(search=search, relative_pos=relative_pos, obj_class='posixGroup')
+
+    def get_group(self, cname):
+        """
+        Get group by cname
+        Args:
+            cname (str): cname of a group
+
+        Returns:
+        """
+        return self.get_groups(f"cn={cname}")
 
     def create_group_dict(self, name):
         dic = dict(
@@ -216,7 +288,7 @@ class Edap(LdapObjectsMixin, LdapGroupMixin, OrganizationalUnitMixin, LdapUserMi
         self.BASE_DN = ",".join(basedn_components)
 
         admin_dn = f"{admin_cn},{self.BASE_DN}"
-        self.ldap = ldap.initialize("ldap://{}".format(hostname))
+        self.ldap = ldap.initialize(f"ldap://{hostname}")
         self.ldap.bind_s(admin_dn, password)
 
         self.PEOPLE_GROUP = f"ou=people,{self.BASE_DN}"

@@ -19,7 +19,6 @@ ADMIN_PASSWORD = os.environ.get("LDAP_ADMIN_PASSWORD")
 @pytest.fixture(scope="session")
 def edap():
     edap = Edap("ldap", ADMIN_CN, ADMIN_PASSWORD, DOMAIN)
-    print(ADMIN_CN, ADMIN_PASSWORD)
     yield edap
     edap.ldap.unbind_s()
 
@@ -57,6 +56,15 @@ def test_assign_membership():
     assert "user4" in divisions["fin"]
 
 
+def test_get_groups(edap):
+    """ Test LdapGroupMixin get_groups, get_group methods """
+    group_name = "test_group"
+    assert len(edap.get_groups(search=f'cname={group_name}')) == 0
+    res = edap.create_group(group_name, 'test_org_unit')
+    assert len(edap.get_groups(search=f'cn={group_name}')) == 1
+    assert edap.get_groups(search=f'cn={group_name}') == edap.get_group(group_name)
+
+
 def test_blank(edap):
     assert not edap.subobject_exists_at(f"ou=people", "organizationalUnit")
     edap.create_org_unit("people", edap.PEOPLE_GROUP)
@@ -64,16 +72,47 @@ def test_blank(edap):
     assert not edap.subobject_exists_at("ou=people", "foobar")
 
 
-def test_user_becomes_present(edap):
-    assert not edap.user_of_uid_exists("kohout")
-    edap.add_user("kohout", "Kohutik", "Pestry", "kohuticek")
-    assert edap.user_of_uid_exists("kohout")
-
-
 def test_divisions_becomes_present(edap):
     assert not edap.org_unit_exists("divisions")
     edap.create_org_unit("ou=divisions", edap.DIVISIONS_GROUP)
     assert edap.org_unit_exists("divisions")
+
+
+def test_get_objects(edap):
+    """ Test LdapObjectsMixin's get_objects, get_object methods """
+    org_unit = "testObjects"
+    assert len(edap.get_objects(search=f"ou={org_unit}", obj_class="organizationalUnit")) == 0
+    edap.create_org_unit(f"{org_unit}", f"ou={org_unit},{edap.BASE_DN}")
+    assert edap.get_objects(relative_pos=f"ou={org_unit}") == edap.get_objects(relative_pos=f"ou={org_unit}")
+    assert len(edap.get_subobjects(relative_pos=f"ou={org_unit}", obj_class="organizationalUnit")) == 1
+    assert not edap.get_subobjects(f"ou={org_unit}", search="cname=foobar")
+
+
+def test_get_users(edap):
+    """ Test LdapUserMixin's get_users, get_user methods """
+    user_id = 'testUser'
+    assert len(edap.get_users(search=f"uid={user_id}")) == 0
+    edap.add_user(user_id, 'test', 'test', 'testPassword')
+    assert len(edap.get_users(search=f"uid={user_id}")) == 1
+    assert edap.get_user(user_id) == edap.get_users(search=f"uid={user_id}")
+
+
+def test_get_user_groups(edap):
+    """ Test LdapUserMixin's get_user_groups method """
+    user_id = 'testUserGroups'
+    group_name = 'test_user_groups'
+    edap.add_user(user_id, 'test', 'test', 'testPassword')
+    edap.create_division(group_name)
+    assert len(edap.get_user_groups(user_id)) == 0
+    edap.make_uid_member_of(user_id, f'cn={group_name},{edap.DIVISIONS_GROUP}')
+    assert len(edap.get_user_groups(user_id)) == 1
+    assert edap.get_user_groups(user_id)[0][1]['cn'][0] == group_name.encode('utf-8')
+
+
+def test_user_becomes_present(edap):
+    assert not edap.user_of_uid_exists("kohout")
+    edap.add_user("kohout", "Kohutik", "Pestry", "kohuticek")
+    assert edap.user_of_uid_exists("kohout")
 
 
 def test_it_division_becomes_present(edap):
