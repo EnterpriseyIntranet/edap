@@ -6,7 +6,7 @@ import argparse
 import ldap
 import ldap.modlist
 
-import constants as c
+from edap import constants as c
 
 
 class ConstraintError(RuntimeError):
