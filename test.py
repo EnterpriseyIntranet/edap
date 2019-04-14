@@ -8,7 +8,7 @@ import pytest
 
 sys.path.insert(0, join(dirname(__file__), 'src'))
 
-from edap import Edap, ConstraintError
+from edap import Edap, ConstraintError, get_single_object, ObjectDoesNotExist, MultipleObjectsFound
 from edap import import_data
 
 DOMAIN = os.environ.get("DOMAIN")
@@ -59,10 +59,11 @@ def test_assign_membership():
 def test_get_groups(edap):
     """ Test LdapGroupMixin get_groups, get_group methods """
     group_name = "test_group"
+    org_unit_name = 'test_org_unit'
     assert len(edap.get_groups(search=f'cname={group_name}')) == 0
-    res = edap.create_group(group_name, 'test_org_unit')
+    res = edap.create_group(group_name, org_unit_name)
     assert len(edap.get_groups(search=f'cn={group_name}')) == 1
-    assert edap.get_groups(search=f'cn={group_name}') == edap.get_group(group_name)
+    assert edap.get_groups(search=f'cn={group_name}')[0] == edap.get_group(group_name, org_unit_name)
 
 
 def test_blank(edap):
@@ -94,7 +95,7 @@ def test_get_users(edap):
     assert len(edap.get_users(search=f"uid={user_id}")) == 0
     edap.add_user(user_id, 'test', 'test', 'testPassword')
     assert len(edap.get_users(search=f"uid={user_id}")) == 1
-    assert edap.get_user(user_id) == edap.get_users(search=f"uid={user_id}")
+    assert edap.get_user(user_id) == edap.get_users(search=f"uid={user_id}")[0]
 
 
 def test_get_user_groups(edap):
@@ -116,9 +117,12 @@ def test_user_becomes_present(edap):
 
 
 def test_it_division_becomes_present(edap):
+    description = b"It division"
     assert not edap.object_exists_at(f"cn=it,{edap.DIVISIONS_GROUP}", "posixGroup")
-    edap.create_division("it")
+    edap.create_division("it", display_name=description)
     assert edap.object_exists_at(f"cn=it,{edap.DIVISIONS_GROUP}", "posixGroup")
+    res = edap.get_division("it")
+    assert description in res[1]['description']
 
 
 def test_new_it_guy(edap):
@@ -156,3 +160,17 @@ def test_label_franchise(edap):
     assert edap.label_franchise("cz_prg") == "Czech Republic"
     with pytest.raises(KeyError):
         assert edap.label_franchise("@@")
+
+
+def test_get_single_object():
+    """ test get_single_object func """
+    data_empty = []
+    data_single = [1]
+    data_multiple = [1, 2]
+    with pytest.raises(ObjectDoesNotExist):
+        get_single_object(data_empty)
+    with pytest.raises(MultipleObjectsFound):
+        get_single_object(data_multiple)
+
+    assert data_single[0] == get_single_object(data_single)
+

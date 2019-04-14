@@ -13,6 +13,25 @@ class ConstraintError(RuntimeError):
     pass
 
 
+class ObjectDoesNotExist(Exception):
+    """ Base exception if searched object cannot be found """
+    pass
+
+
+class MultipleObjectsFound(Exception):
+    """ Base exception if found more than one object """
+    pass
+
+
+def get_single_object(data):
+    """ Get first element of a list, or raise Exception if list length > 1 or equals 0 """
+    if len(data) == 0:
+        raise ObjectDoesNotExist('Object does not exist')
+    elif len(data) > 1:
+        raise MultipleObjectsFound('Multiple objects found')
+    return data[0]
+
+
 def _hashPassword(password):
     salt = os.urandom(4)
     h = hashlib.sha1(password.encode("ASCII"))
@@ -87,7 +106,7 @@ class LdapUserMixin(object):
 
         Returns:
         """
-        return self.get_users(search=f"uid={uid}")
+        return get_single_object(self.get_users(search=f"uid={uid}"))
 
     def get_user_groups(self, uid):
         """
@@ -186,7 +205,7 @@ class LdapGroupMixin(object):
         if not self.org_unit_exists(organizational_unit):
             self.create_org_unit(org_unit, f"{org_unit},{self.BASE_DN}")
         if self.group_exists(name, organizational_unit):
-            raise RuntimeError("Group with such name under this organizational unit already exists")
+            raise ConstraintError("Group with such name under this organizational unit already exists")
         dic = self.create_group_dict(f"{name}")
         if description:
             dic['description'] = description
@@ -204,7 +223,7 @@ class LdapGroupMixin(object):
         relative_pos = f"ou={organizational_unit}" if organizational_unit else None
         return self.get_objects(search=search, relative_pos=relative_pos, obj_class='posixGroup')
 
-    def get_group(self, cname):
+    def get_group(self, cname, organizational_unit):
         """
         Get group by cname
         Args:
@@ -212,7 +231,7 @@ class LdapGroupMixin(object):
 
         Returns:
         """
-        return self.get_groups(f"cn={cname}")
+        return get_single_object(self.get_groups(f"cn={cname}", organizational_unit=organizational_unit))
 
     def create_group_dict(self, name):
         dic = dict(
@@ -235,9 +254,45 @@ class LdapServiceMixin(object):
 
 
 class LdapDivisionMixin(object):
+    """
+    Division is a posixGroup, child of organizationalUnit ou=divisions that is just below the base DN.
 
-    def create_division(self, name):
-        return self.create_group(name=name, organizational_unit="divisions")
+    A division has machine and display names. A division's DN begins with cn=<machine name>,
+    e.g. the full division DN of a publishing division is cn=PUB,ou=divisions,dc=entint,dc=org.
+    The description attribute of a division stores it's display name, e.g. Publishing in this case.
+
+    The group's gidNumber is not important.
+    """
+
+    def get_divisions(self, search=None):
+        """ Get objects (of posixGroup class) with organizational unit 'divisions' by given search """
+        return self.get_objects(search=search, relative_pos='ou=divisions', obj_class='posixGroup')
+
+    def get_division(self, name):
+        """
+        Get division by cname
+
+        Args:
+            name (str): division name
+
+        Returns:
+
+        """
+        return get_single_object(self.get_divisions(f'cn={name}'))
+
+    def create_division(self, machine_name, display_name=None):
+        """
+        Create division
+
+        Args:
+            machine_name (str): division's cname
+            display_name (str): division's display name, stored in description
+
+        Returns:
+
+        """
+        display_name_bytes = display_name.encode('utf-8') if isinstance(display_name, str) else display_name
+        return self.create_group(name=machine_name, organizational_unit="divisions", description=display_name_bytes)
 
     def create_all_divisions(self, source):
         for dname in source:
