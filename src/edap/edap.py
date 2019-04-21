@@ -102,6 +102,10 @@ class LdapObjectsMixin(object):
     def get_subobjects(self, relative_pos, search=None, obj_class=None):
         return self.get_objects(search=search, relative_pos=relative_pos, obj_class=obj_class)
 
+    def delete_object(self, dn):
+        """ Delete object by dn """
+        return self.delete_s(dn)
+
 
 class LdapUserMixin(object):
 
@@ -206,6 +210,9 @@ class LdapUserMixin(object):
         group_fqdn = f"cn={name},{self.SERVICES_GROUP}"
         return self.remove_uid_member_of(uid, group_fqdn)
 
+    def delete_user(self, uid):
+        return self.delete_object(f"uid={uid},{self.PEOPLE_GROUP}")
+
 
 class OrganizationalUnitMixin(object):
 
@@ -272,6 +279,18 @@ class LdapGroupMixin(object):
     def group_exists(self, name, organizational_unit):
         return self.subobject_exists_at(f"cn={name},ou={organizational_unit}", "posixGroup")
 
+    def delete_group(self, cname, organizational_unit):
+        """
+        Delete group by cname and ou
+
+        Args:
+            cname (str): group's cname
+            organizational_unit (str): group's organizational unit
+
+        Returns:
+        """
+        return self.delete_object(f"cn={cname},ou={organizational_unit},{self.BASE_DN}")
+
 
 class LdapServiceMixin(object):
 
@@ -323,6 +342,18 @@ class LdapDivisionMixin(object):
     def create_all_divisions(self, source):
         for dname in source:
             self.create_division(dname)
+
+    def delete_division(self, machine_name):
+        """
+        Delete division by cname
+
+        Args:
+            machine_name (str): division's cname
+
+        Returns:
+        """
+        division_dn = f"cn={machine_name},{self.DIVISIONS_GROUP}"
+        return self.delete_object(division_dn)
 
 
 class LdapFranchiseMixin(object):
@@ -391,6 +422,9 @@ class Edap(LdapObjectsMixin, LdapGroupMixin, OrganizationalUnitMixin, LdapUserMi
 
     def unbind_s(self):
         return self.ldap.unbind_s()
+
+    def delete_s(self, *args, **kwargs):
+        return self.ldap.delete_s(*args, **kwargs)
 
 
 if __name__ == "__main__":
