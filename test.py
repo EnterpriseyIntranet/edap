@@ -8,8 +8,8 @@ import pytest
 
 sys.path.insert(0, join(dirname(__file__), 'src'))
 
-from edap import Edap, ConstraintError, get_single_object, ObjectDoesNotExist, MultipleObjectsFound
-from edap import import_data
+from edap import Edap, ConstraintError, get_single_object, ldap_tuple_to_object, import_data, ObjectDoesNotExist, \
+    MultipleObjectsFound
 
 DOMAIN = os.environ.get("DOMAIN")
 ADMIN_CN = "cn=admin"
@@ -107,7 +107,7 @@ def test_get_user_groups(edap):
     assert len(edap.get_user_groups(user_id)) == 0
     edap.make_uid_member_of(user_id, f'cn={group_name},{edap.DIVISIONS_GROUP}')
     assert len(edap.get_user_groups(user_id)) == 1
-    assert edap.get_user_groups(user_id)[0][1]['cn'][0] == group_name.encode('utf-8')
+    assert edap.get_user_groups(user_id)[0]['cn'][0] == group_name.encode('utf-8')
 
 
 def test_user_becomes_present(edap):
@@ -122,7 +122,7 @@ def test_it_division_becomes_present(edap):
     edap.create_division("it", display_name=description)
     assert edap.object_exists_at(f"cn=it,{edap.DIVISIONS_GROUP}", "posixGroup")
     res = edap.get_division("it")
-    assert description in res[1]['description']
+    assert description in res['description']
 
 
 def test_new_it_guy(edap):
@@ -165,8 +165,8 @@ def test_label_franchise(edap):
 def test_get_single_object():
     """ test get_single_object func """
     data_empty = []
-    data_single = [1]
-    data_multiple = [1, 2]
+    data_single = [('cn=test,dc=entint,dc=org', {'cn': 'test'})]
+    data_multiple = [('cn=test,dc=entint,dc=org', {'cn': 'test'}), ('cn=test,dc=entint,dc=org', {'cn': 'test'})]
     with pytest.raises(ObjectDoesNotExist):
         get_single_object(data_empty)
     with pytest.raises(MultipleObjectsFound):

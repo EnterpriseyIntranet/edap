@@ -9,6 +9,32 @@ import ldap.modlist
 from edap import constants as c
 
 
+def transform_ldap_response(ldap_response):
+    """
+    Transform list of ldap tuples to list of dicts
+    Args:
+        ldap_response (list):
+
+    Returns:
+    """
+    return [ldap_tuple_to_object(each) for each in ldap_response]
+
+
+def ldap_tuple_to_object(ldap_tuple):
+    """
+    Transform tuple from ldap response (dn, attributes) to dict with all attributes and dn as fqdn
+
+    Args:
+        ldap_tuple (tuple): object from ldap response
+
+    Returns:
+    """
+    return {
+        'fqdn': ldap_tuple[0],
+        **ldap_tuple[1]
+    }
+
+
 class ConstraintError(RuntimeError):
     pass
 
@@ -71,7 +97,7 @@ class LdapObjectsMixin(object):
                 search = f"(objectClass={obj_class})"
         if relative_pos:
             root = f"{relative_pos},{root}"
-        return self.search_s(root, ldap.SCOPE_SUBTREE, search)
+        return transform_ldap_response(self.search_s(root, ldap.SCOPE_SUBTREE, search))
 
     def get_subobjects(self, relative_pos, search=None, obj_class=None):
         return self.get_objects(search=search, relative_pos=relative_pos, obj_class=obj_class)
@@ -118,7 +144,7 @@ class LdapUserMixin(object):
         Returns (list):
         """
         search = f"(&(memberUid={uid})(objectClass=posixGroup))"
-        return self.search_s(self.BASE_DN, ldap.SCOPE_SUBTREE, search)
+        return transform_ldap_response(self.search_s(self.BASE_DN, ldap.SCOPE_SUBTREE, search))
 
     def mk_add_user_modlist(self, uid, name, surname, password):
         mail = f"{uid}@example.com".encode("ASCII")
