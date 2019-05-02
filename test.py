@@ -3,6 +3,7 @@ import sys
 from os.path import dirname
 from os.path import join
 import collections
+import ldap
 
 import pytest
 
@@ -87,6 +88,46 @@ def test_get_objects(edap):
     assert edap.get_objects(relative_pos=f"ou={org_unit}") == edap.get_objects(relative_pos=f"ou={org_unit}")
     assert len(edap.get_subobjects(relative_pos=f"ou={org_unit}", obj_class="organizationalUnit")) == 1
     assert not edap.get_subobjects(f"ou={org_unit}", search="cname=foobar")
+
+
+def test_delete_object(edap):
+    """ Test LdapObjectsMixin's delete_object method """
+    group_name = 'toDelete'
+    group_ou_name = 'toDeleteDivision'
+    new_object_dn = f"cn={group_name},ou={group_ou_name},{edap.BASE_DN}"
+    edap.create_group(name=group_name, organizational_unit=group_ou_name)
+    assert len(edap.search_s(new_object_dn, ldap.SCOPE_BASE))
+    edap.delete_object(new_object_dn)
+    with pytest.raises(ldap.NO_SUCH_OBJECT):
+        len(edap.search_s(new_object_dn, ldap.SCOPE_BASE))
+
+
+def test_delete_group(edap):
+    group_cname = 'groupToDelete'
+    group_ou = 'ouToDelete'
+    edap.create_group(group_cname, group_ou)
+    assert edap.get_group(group_cname, group_ou)
+    edap.delete_group(group_cname, group_ou)
+    with pytest.raises(ObjectDoesNotExist):
+        edap.get_group(group_cname, group_ou)
+
+
+def test_delete_user(edap):
+    uid = 'userToDelete'
+    edap.add_user(uid, 'test_name', 'test_surname', 'testpassword')
+    assert edap.get_user(uid)
+    edap.delete_user(uid)
+    with pytest.raises(ObjectDoesNotExist):
+        edap.get_user(uid)
+
+
+def test_delete_division(edap):
+    division_cname = 'divisionToDelete'
+    edap.create_division(division_cname)
+    assert edap.get_division(division_cname)
+    edap.delete_division(division_cname)
+    with pytest.raises(ObjectDoesNotExist):
+        edap.get_division(division_cname)
 
 
 def test_get_users(edap):
