@@ -1,0 +1,17 @@
+language: python
+
+services:
+  docker
+
+python:
+  - "3.6"
+
+before_script:
+  - cd docker && docker-compose up -d openldap
+
+# commands to run tests
+script:
+  - docker-compose run --rm python python3 -m pytest test.py
+
+after_script:
+  - docker-compose down -v
