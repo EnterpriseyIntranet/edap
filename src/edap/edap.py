@@ -191,6 +191,18 @@ class LdapUserMixin(object):
         group_fqdn = f"cn={name},{self.SERVICES_GROUP}"
         return self.make_uid_member_of(uid, group_fqdn)
 
+    def make_user_member_of_franchise(self, uid, franchise_name):
+        """
+        Make user member of franchise group
+        Args:
+            uid (str): user uid
+            franchise_name (str): cname of a franchise
+
+        Returns:
+        """
+        group_fqdn = f"cn={franchise_name},{self.FRANCHISES_GROUP}"
+        return self.make_uid_member_of(uid, group_fqdn)
+
     def remove_uid_member_of(self, uid, group_fqdn):
         if self.object_exists_at(group_fqdn, "posixGroup") == 0:
             raise ConstraintError(f"Group {group_fqdn} doesn't exist.")
@@ -208,6 +220,10 @@ class LdapUserMixin(object):
 
     def remove_uid_member_of_service_group(self, uid, name):
         group_fqdn = f"cn={name},{self.SERVICES_GROUP}"
+        return self.remove_uid_member_of(uid, group_fqdn)
+
+    def remove_uid_member_of_franchise(self, uid, franchise_name):
+        group_fqdn = f"cn={franchise_name},{self.FRANCHISES_GROUP}"
         return self.remove_uid_member_of(uid, group_fqdn)
 
     def delete_user(self, uid):
@@ -357,25 +373,61 @@ class LdapDivisionMixin(object):
 
 
 class LdapFranchiseMixin(object):
+    """
+    Franchise is a posixGroup, child of organizationalUnit ou=franchises that is just below the base DN
 
-    def create_franchise(self, name):
-        description = self.label_franchise(name).encode("UTF-8")
-        return self.create_group(name, "franchises", description=description)
+    Franchise code is `<country_code>_<something>` where country_code is ISO3166-1-Alpha-2 code
+    """
 
-    def label_franchise(self, name):
-        for code, country_name in c.COUNTRIES_CODES.items():
-            if name.startswith(code):
-                return country_name
-        raise KeyError(f"Invalid country code to match '{name}'")
+    def get_franchises(self, search=None):
+        return self.get_subobjects(self.FRANCHISES, search, obj_class='posixGroup')
+
+    def get_franchise(self, code):
+        """
+        Get franchise by code
+        Args:
+            code (str): franchise code
+
+        Returns (dict): franchise data dict or raise error if not found or found more than 1 franchise
+        """
+        return get_single_object(self.get_franchises(f'cn={code}'))
+
+    def create_franchise(self, code):
+        """
+        Create franchise
+        Args:
+            code (str): country code
+
+        Returns:
+        """
+        description = self.label_franchise(code).encode("UTF-8")
+        return self.create_group(code, self.FRANCHISE_GROUP_NAME, description=description)
+
+    def label_franchise(self, code):
+        """
+        Get franchise name by country code from constants
+        Args:
+            code (str): franchise code
+
+        Returns:
+        """
+        if '_' in code:
+            splitted_code = code.split('_')
+            if splitted_code[1]:
+                code = splitted_code[0]
+        country_name = c.COUNTRIES_CODES.get(code, None)
+        if not country_name:
+            raise KeyError(f"Invalid country code to match '{code}'")
+        return country_name
 
     def create_all_franchises(self, source):
-        for frname in source:
-            self.create_franchise(frname)
+        for code in source:
+            self.create_franchise(code)
 
 
 def ensure_org_sanity(edap, source):
     edap.create_all_divisions(source["divisions"])
-    edap.create_all_franchises(source["countries"])
+    edap.create_all_franchises(source["franchises"])
     edap.create_org_unit("people", edap.ldap.PEOPLE_GROUP)
     edap.create_org_unit("people", edap.ldap.PEOPLE_GROUP)
 
@@ -406,7 +458,8 @@ class Edap(LdapObjectsMixin, LdapGroupMixin, OrganizationalUnitMixin, LdapUserMi
         self.PEOPLE_GROUP = f"ou=people,{self.BASE_DN}"
         self.DIVISIONS = "ou=divisions"
         self.DIVISIONS_GROUP = f"{self.DIVISIONS},{self.BASE_DN}"
-        self.FRANCHISES = "ou=franchises"
+        self.FRANCHISE_GROUP_NAME = 'franchises'
+        self.FRANCHISES = f"ou={self.FRANCHISE_GROUP_NAME}"
         self.FRANCHISES_GROUP = f"{self.FRANCHISES},{self.BASE_DN}"
         self.SERVICES = "ou=services"
         self.SERVICES_GROUP = f"{self.SERVICES},{self.BASE_DN}"

@@ -189,18 +189,22 @@ def test_new_it_guy(edap):
         edap.make_uid_member_of("blbec", it_group_dn)
 
 
-def test_czech_franchise_becomes_present(edap):
-    assert not edap.subobject_exists_at(f"cn=cz_prg,{edap.FRANCHISES}", "posixGroup")
-    edap.create_franchise("cz_prg")
-    assert edap.subobject_exists_at(f"cn=cz_prg,{edap.FRANCHISES}", "posixGroup")
-    assert edap.object_exists(f"&(commonName=cz_prg)(description=Czech Republic)", "posixGroup")
-
-
 def test_label_franchise(edap):
-    assert edap.label_franchise("cz") == "Czech Republic"
-    assert edap.label_franchise("cz_prg") == "Czech Republic"
+    assert edap.label_franchise("cz") == "Czechia"
+    assert edap.label_franchise("cz_prg") == "Czechia"
     with pytest.raises(KeyError):
         assert edap.label_franchise("@@")
+
+
+def test_czech_franchise_becomes_present(edap):
+    franchise_cname = 'cz_prg'
+    franchise_description = 'Czechia'
+    assert not edap.subobject_exists_at(f"cn={franchise_cname},{edap.FRANCHISES}", "posixGroup")
+    edap.create_franchise(franchise_cname)
+    assert edap.subobject_exists_at(f"cn={franchise_cname},{edap.FRANCHISES}", "posixGroup")
+    assert edap.object_exists(f"&(commonName={franchise_cname})(description={franchise_description})", "posixGroup")
+    assert edap.get_franchise(franchise_cname)['cn'][0] == franchise_cname.encode('utf-8')
+    assert edap.get_franchise(franchise_cname)['description'][0] == franchise_description.encode('utf-8')
 
 
 def test_get_single_object():
