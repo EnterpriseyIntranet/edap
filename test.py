@@ -192,8 +192,12 @@ def test_new_it_guy(edap):
 def test_label_franchise(edap):
     assert edap.label_franchise("cz") == "Czechia"
     assert edap.label_franchise("cz_prg") == "Czechia"
+    double_underscore_code = 'cz__'
     with pytest.raises(KeyError):
-        assert edap.label_franchise("@@")
+        assert edap.label_franchise(double_underscore_code)
+    invalid_code = 'cz_'
+    with pytest.raises(KeyError):
+        assert edap.label_franchise(invalid_code)
 
 
 def test_czech_franchise_becomes_present(edap):
