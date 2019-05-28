@@ -425,6 +425,60 @@ class LdapFranchiseMixin(object):
             self.create_franchise(code)
 
 
+class LdapTeamMixin(object):
+    """
+    Team is a posixGroup, child of organizationalUnit ou=teams that is just below the base DN.
+
+    Like division, team has machine and display names. A teams's DN begins with cn=,
+    e.g. the full team DN of a Polish publishing division is cn=PL-PUB,ou=teams,dc=entint,dc=org.
+    The description attribute of a team stores it's display name, e.g. Poland Publishing in this case.
+
+    The group's gidNumber is not important.
+    """
+
+    def get_teams(self, search=None):
+        """ Get objects (of posixGroup class) with organizational unit 'teams' by given search """
+        return self.get_objects(search=search, relative_pos='ou=teams', obj_class='posixGroup')
+
+    def get_team(self, name):
+        """
+        Get team by cname
+
+        Args:
+            name (str): team name
+
+        Returns:
+
+        """
+        return get_single_object(self.get_teams(f'cn={name}'))
+
+    def create_team(self, machine_name, display_name=None):
+        """
+        Create team
+
+        Args:
+            machine_name (str): team's cname
+            display_name (str): team's display name, stored in description
+
+        Returns:
+
+        """
+        display_name_bytes = display_name.encode('utf-8') if isinstance(display_name, str) else display_name
+        return self.create_group(name=machine_name, organizational_unit="teams", description=display_name_bytes)
+
+    def delete_team(self, machine_name):
+        """
+        Delete team by cname
+
+        Args:
+            machine_name (str): team's cname
+
+        Returns:
+        """
+        team_dn = f"cn={machine_name},{self.TEAMS_GROUP}"
+        return self.delete_object(team_dn)
+
+
 def ensure_org_sanity(edap, source):
     edap.create_all_divisions(source["divisions"])
     edap.create_all_franchises(source["franchises"])
@@ -442,7 +496,7 @@ def update_parser(parser=None):
 
 
 class Edap(LdapObjectsMixin, LdapGroupMixin, OrganizationalUnitMixin, LdapUserMixin,
-           LdapFranchiseMixin, LdapDivisionMixin, LdapServiceMixin):
+           LdapTeamMixin, LdapFranchiseMixin, LdapDivisionMixin, LdapServiceMixin):
 
     def __init__(self, hostname, admin_cn, password, domain=None):
         if domain is None:
@@ -458,6 +512,8 @@ class Edap(LdapObjectsMixin, LdapGroupMixin, OrganizationalUnitMixin, LdapUserMi
         self.PEOPLE_GROUP = f"ou=people,{self.BASE_DN}"
         self.DIVISIONS = "ou=divisions"
         self.DIVISIONS_GROUP = f"{self.DIVISIONS},{self.BASE_DN}"
+        self.TEAMS = "ou=teams"
+        self.TEAMS_GROUP = f"{self.TEAMS},{self.BASE_DN}"
         self.FRANCHISE_GROUP_NAME = 'franchises'
         self.FRANCHISES = f"ou={self.FRANCHISE_GROUP_NAME}"
         self.FRANCHISES_GROUP = f"{self.FRANCHISES},{self.BASE_DN}"
