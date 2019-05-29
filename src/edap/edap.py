@@ -486,6 +486,35 @@ def ensure_org_sanity(edap, source):
     edap.create_org_unit("people", edap.ldap.PEOPLE_GROUP)
 
 
+def get_not_corresponding_teams(edap):
+    """
+    Get teams that not correspond to existing franchises and divisions
+
+    Team cn must be constructed from existing division and franchise cns <franchise_cn>_<division_cn>
+    For example if there is PL-PUB team, then there needs to be a country PL and a division PUB
+    """
+    not_corresponding_teams = []
+    teams = edap.get_teams()
+    for team in teams:
+        team_machine_name = team['cn'][0]
+
+        try:
+            franchise_name, division_name, *redundant = team_machine_name.decode('utf-8').split('-', 1)
+        except ValueError:
+            not_corresponding_teams.append(team)
+
+        if not all([franchise_name, division_name]):
+            not_corresponding_teams.append(team)
+
+        try:
+            edap.get_franchise(franchise_name)
+            edap.get_division(division_name)
+        except (ObjectDoesNotExist, MultipleObjectsFound):
+            not_corresponding_teams.append(team)
+
+    return not_corresponding_teams
+
+
 def update_parser(parser=None):
     if parser is None:
         parser = argparse.ArgumentParser()
