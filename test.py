@@ -10,7 +10,7 @@ import pytest
 sys.path.insert(0, join(dirname(__file__), 'src'))
 
 from edap import Edap, ConstraintError, get_single_object, ldap_tuple_to_object, import_data, ObjectDoesNotExist, \
-    MultipleObjectsFound, get_not_corresponding_teams
+    MultipleObjectsFound, get_not_matching_teams_by_cn
 
 DOMAIN = os.environ.get("DOMAIN")
 ADMIN_CN = "cn=admin"
@@ -217,19 +217,19 @@ def test_corresponding_teams(edap):
 
     edap.create_team("{}-{}".format(us_franchise_code, test_division_cn), 'test team')
     # assert all teams are valid
-    assert len(get_not_corresponding_teams(edap)) == 0
+    assert len(get_not_matching_teams_by_cn(edap)) == 0
 
     # add team with not existing division
     wrong_division_team_cn = "{}-{}".format(us_franchise_code, 'not-existing-division')
     edap.create_team(wrong_division_team_cn, 'test team')
-    not_corresponding_teams = get_not_corresponding_teams(edap)
+    not_corresponding_teams = get_not_matching_teams_by_cn(edap)
     assert len(not_corresponding_teams) == 1
     assert not_corresponding_teams[0]['cn'][0].decode('utf-8') == wrong_division_team_cn
 
     # add team with not existing franchise
     wrong_franchise_team_cn = "not-existing-franchise-{}".format(test_division_cn)
     edap.create_team(wrong_franchise_team_cn, 'test team')
-    not_corresponding_teams = get_not_corresponding_teams(edap)
+    not_corresponding_teams = get_not_matching_teams_by_cn(edap)
     not_corresponding_teams_cns = [each['cn'][0].decode('utf-8') for each in not_corresponding_teams]
     assert len(not_corresponding_teams) == 2
     assert wrong_franchise_team_cn in not_corresponding_teams_cns

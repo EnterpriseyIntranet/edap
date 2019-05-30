@@ -478,6 +478,21 @@ class LdapTeamMixin(object):
         team_dn = f"cn={machine_name},{self.TEAMS_GROUP}"
         return self.delete_object(team_dn)
 
+    def get_team_component_units(self, machine_name):
+        """
+        Get composing franchise and division from team cn
+        Args:
+            team (dict): ldap team
+
+        Returns:
+        """
+        franchise_name, division_name = machine_name.decode('utf-8').split('-', 1)
+        if not all([franchise_name, division_name]):
+            raise ObjectDoesNotExist
+        franchise = self.get_franchise(franchise_name)
+        division = self.get_division(division_name)
+        return franchise, division
+
 
 def ensure_org_sanity(edap, source):
     edap.create_all_divisions(source["divisions"])
@@ -486,9 +501,9 @@ def ensure_org_sanity(edap, source):
     edap.create_org_unit("people", edap.ldap.PEOPLE_GROUP)
 
 
-def get_not_corresponding_teams(edap):
+def get_not_matching_teams_by_cn(edap):
     """
-    Get teams that not correspond to existing franchises and divisions
+    Get teams that not correspond to existing franchises and divisions by cn
 
     Team cn must be constructed from existing division and franchise cns <franchise_cn>_<division_cn>
     For example if there is PL-PUB team, then there needs to be a country PL and a division PUB
@@ -496,20 +511,39 @@ def get_not_corresponding_teams(edap):
     not_corresponding_teams = []
     teams = edap.get_teams()
     for team in teams:
+
         team_machine_name = team['cn'][0]
-
         try:
-            franchise_name, division_name, *redundant = team_machine_name.decode('utf-8').split('-', 1)
-        except ValueError:
-            not_corresponding_teams.append(team)
-
-        if not all([franchise_name, division_name]):
-            not_corresponding_teams.append(team)
-
-        try:
-            edap.get_franchise(franchise_name)
-            edap.get_division(division_name)
+            edap.get_team_component_units(team_machine_name)
         except (ObjectDoesNotExist, MultipleObjectsFound):
+            not_corresponding_teams.append(team)
+            continue
+
+    return not_corresponding_teams
+
+
+def get_not_matching_teams_by_description(edap):
+    """
+    Get teams that not correspond to existing franchises and divisions by descriiption
+
+    Team description must be constructed from existing division and franchise descriptions
+    <franchise_description>_<division_description>
+    For example if there is Poland and Publishing, it should be 'Poland Publishing' team, but not 'Polish Publishing'
+    """
+    not_corresponding_teams = []
+    teams = edap.get_teams()
+    for team in teams:
+        team_machine_name = team['cn'][0]
+        team_display_name = team['description'][0]
+
+        try:
+            franchise, division = edap.get_team_component_units(team_machine_name)
+        except (ObjectDoesNotExist, MultipleObjectsFound):
+            not_corresponding_teams.append(team)
+            continue
+
+        expected_display_name = "{} {}".format(franchise['desctiption'][0], division['description'][0])
+        if team_display_name != expected_display_name:
             not_corresponding_teams.append(team)
 
     return not_corresponding_teams
