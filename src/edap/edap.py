@@ -478,6 +478,34 @@ class LdapTeamMixin(object):
         team_dn = f"cn={machine_name},{self.TEAMS_GROUP}"
         return self.delete_object(team_dn)
 
+    @staticmethod
+    def make_team_display_name(franchise_name, division_name):
+        """
+        Compose team display name from franchise and division display names
+        Args:
+            franchise_name (str): display name of franchise
+            division_name (str): display name of division
+
+        Returns:
+        """
+        franchise_name = franchise_name.decode('utf-8') if isinstance(franchise_name, bytes) else franchise_name
+        division_name = division_name.decode('utf-8') if isinstance(division_name, bytes) else division_name
+        return "{} {}".format(franchise_name, division_name)
+
+    @staticmethod
+    def make_team_machine_name(franchise_name, division_name):
+        """
+        Compose team machine name from franchise and division machine names
+        Args:
+            franchise_name (str): machine name of franchise
+            division_name (str): machine name of division
+
+        Returns:
+        """
+        franchise_name = franchise_name.decode('utf-8') if isinstance(franchise_name, bytes) else franchise_name
+        division_name = division_name.decode('utf-8') if isinstance(division_name, bytes) else division_name
+        return "{}-{}".format(franchise_name, division_name)
+
     def get_team_component_units(self, machine_name):
         """
         Get composing franchise and division from team cn
@@ -534,7 +562,7 @@ def get_not_matching_teams_by_description(edap):
     teams = edap.get_teams()
     for team in teams:
         team_machine_name = team['cn'][0]
-        team_display_name = team['description'][0]
+        team_display_name = team['description'][0].decode('utf-8')
 
         try:
             franchise, division = edap.get_team_component_units(team_machine_name)
@@ -542,7 +570,7 @@ def get_not_matching_teams_by_description(edap):
             not_corresponding_teams.append(team)
             continue
 
-        expected_display_name = "{} {}".format(franchise['desctiption'][0], division['description'][0])
+        expected_display_name = edap.make_team_display_name(franchise['description'][0], division['description'][0])
         if team_display_name != expected_display_name:
             not_corresponding_teams.append(team)
 

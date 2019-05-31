@@ -10,7 +10,7 @@ import pytest
 sys.path.insert(0, join(dirname(__file__), 'src'))
 
 from edap import Edap, ConstraintError, get_single_object, ldap_tuple_to_object, import_data, ObjectDoesNotExist, \
-    MultipleObjectsFound, get_not_matching_teams_by_cn
+    MultipleObjectsFound, get_not_matching_teams_by_cn, get_not_matching_teams_by_description
 
 DOMAIN = os.environ.get("DOMAIN")
 ADMIN_CN = "cn=admin"
@@ -210,12 +210,16 @@ def test_czech_franchise_becomes_present(edap):
 def test_corresponding_teams(edap):
     """ test func to ensure that all existing teams correspond to countries and divisions """
     us_franchise_code = 'us'
+    us_franchise_display_name = edap.label_franchise(us_franchise_code)
     edap.create_franchise(us_franchise_code)
 
     test_division_cn = 'test-div'
-    edap.create_division(test_division_cn, 'test division')
+    test_division_display_name = 'test division'
+    edap.create_division(test_division_cn, test_division_display_name)
 
-    edap.create_team("{}-{}".format(us_franchise_code, test_division_cn), 'test team')
+    team_display_name = edap.make_team_display_name(us_franchise_display_name, test_division_display_name)
+    team_machine_name = edap.make_team_machine_name(us_franchise_code, test_division_cn)
+    edap.create_team(team_machine_name, team_display_name)
     # assert all teams are valid
     assert len(get_not_matching_teams_by_cn(edap)) == 0
 
@@ -234,6 +238,42 @@ def test_corresponding_teams(edap):
     assert len(not_corresponding_teams) == 2
     assert wrong_franchise_team_cn in not_corresponding_teams_cns
     assert wrong_division_team_cn in not_corresponding_teams_cns
+
+    edap.delete_team(wrong_division_team_cn)
+    edap.delete_team(wrong_franchise_team_cn)
+
+
+def test_corresponding_teams_by_description(edap):
+    """ test func to ensure that all existing teams correspond to countries and divisions """
+    ua_franchise_code = 'ua'
+    ua_franchise_display_name = edap.label_franchise(ua_franchise_code)
+    edap.create_franchise(ua_franchise_code)
+
+    test_division_cn = 'test-div-2'
+    test_division_display_name = 'test division'
+    edap.create_division(test_division_cn, test_division_display_name)
+
+    team_display_name = edap.make_team_display_name(ua_franchise_display_name, test_division_display_name)
+    team_machine_name = edap.make_team_machine_name(ua_franchise_code, test_division_cn)
+    edap.create_team(team_machine_name, team_display_name)
+    # assert all teams are valid
+    assert len(get_not_matching_teams_by_description(edap)) == 0
+    edap.delete_team(team_machine_name)
+
+    # add team with invalid description
+    team_display_name = edap.make_team_display_name(ua_franchise_display_name, test_division_display_name) + ' invalid'
+    team_machine_name = edap.make_team_machine_name(ua_franchise_code, test_division_cn)
+    edap.create_team(team_machine_name, team_display_name)
+    assert len(get_not_matching_teams_by_description(edap)) == 1
+    assert get_not_matching_teams_by_description(edap)[0]['description'][0].decode('utf-8') == team_display_name
+    edap.delete_team(team_machine_name)
+
+    # add team with reverse description name
+    team_display_name = "{} {}".format(test_division_display_name, ua_franchise_display_name)
+    team_machine_name = edap.make_team_machine_name(ua_franchise_code, test_division_cn)
+    edap.create_team(team_machine_name, team_display_name)
+    assert len(get_not_matching_teams_by_description(edap)) == 1
+    assert get_not_matching_teams_by_description(edap)[0]['description'][0].decode('utf-8') == team_display_name
 
 
 def test_get_single_object():
