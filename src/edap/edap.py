@@ -203,6 +203,19 @@ class LdapUserMixin(object):
         group_fqdn = f"cn={franchise_name},{self.FRANCHISES_GROUP}"
         return self.make_uid_member_of(uid, group_fqdn)
 
+    def make_user_member_of_team(self, uid, team_machine_name):
+        """
+        Make user member of team group
+
+        Args:
+            uid (str): user uid
+            team_machine_name (str): cn of a team
+
+        Returns:
+        """
+        group_fqdn = f"cn={team_machine_name},{self.TEAMS_GROUP}"
+        return self.make_uid_member_of(uid, group_fqdn)
+
     def remove_uid_member_of(self, uid, group_fqdn):
         if self.object_exists_at(group_fqdn, "posixGroup") == 0:
             raise ConstraintError(f"Group {group_fqdn} doesn't exist.")
