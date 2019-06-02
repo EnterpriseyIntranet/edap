@@ -9,6 +9,17 @@ import ldap.modlist
 from edap import constants as c
 
 
+def get_str(str_or_bytes):
+    """
+    Decode argument to unicode, utf-8 if it is bytestring, just return otherwise
+    Args:
+        str_or_bytes (str/bytes): arg to decode or return
+
+    Returns (str):
+    """
+    return str_or_bytes.decode('utf-8') if isinstance(str_or_bytes, bytes) else str_or_bytes
+
+
 def transform_ldap_response(ldap_response):
     """
     Transform list of ldap tuples to list of dicts
@@ -501,8 +512,8 @@ class LdapTeamMixin(object):
 
         Returns:
         """
-        franchise_name = franchise_name.decode('utf-8') if isinstance(franchise_name, bytes) else franchise_name
-        division_name = division_name.decode('utf-8') if isinstance(division_name, bytes) else division_name
+        franchise_name = get_str(franchise_name)
+        division_name = get_str(division_name)
         return "{} {}".format(franchise_name, division_name)
 
     @staticmethod
@@ -515,8 +526,8 @@ class LdapTeamMixin(object):
 
         Returns:
         """
-        franchise_name = franchise_name.decode('utf-8') if isinstance(franchise_name, bytes) else franchise_name
-        division_name = division_name.decode('utf-8') if isinstance(division_name, bytes) else division_name
+        franchise_name = get_str(franchise_name)
+        division_name = get_str(division_name)
         return "{}-{}".format(franchise_name, division_name)
 
     def get_team_component_units(self, machine_name):
@@ -527,7 +538,7 @@ class LdapTeamMixin(object):
 
         Returns:
         """
-        franchise_name, division_name = machine_name.decode('utf-8').split('-', 1)
+        franchise_name, division_name = get_str(machine_name).split('-', 1)
         if not all([franchise_name, division_name]):
             raise ObjectDoesNotExist
         franchise = self.get_franchise(franchise_name)
@@ -575,7 +586,7 @@ def get_not_matching_teams_by_description(edap):
     teams = edap.get_teams()
     for team in teams:
         team_machine_name = team['cn'][0]
-        team_display_name = team['description'][0].decode('utf-8')
+        team_display_name = get_str(team['description'][0])
 
         try:
             franchise, division = edap.get_team_component_units(team_machine_name)
