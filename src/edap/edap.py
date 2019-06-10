@@ -9,6 +9,17 @@ import ldap.modlist
 from edap import constants as c
 
 
+def get_str(str_or_bytes):
+    """
+    Decode argument to unicode, utf-8 if it is bytestring, just return otherwise
+    Args:
+        str_or_bytes (str/bytes): arg to decode or return
+
+    Returns (str):
+    """
+    return str_or_bytes.decode('utf-8') if isinstance(str_or_bytes, bytes) else str_or_bytes
+
+
 def transform_ldap_response(ldap_response):
     """
     Transform list of ldap tuples to list of dicts
@@ -201,6 +212,19 @@ class LdapUserMixin(object):
         Returns:
         """
         group_fqdn = f"cn={franchise_name},{self.FRANCHISES_GROUP}"
+        return self.make_uid_member_of(uid, group_fqdn)
+
+    def make_user_member_of_team(self, uid, team_machine_name):
+        """
+        Make user member of team group
+
+        Args:
+            uid (str): user uid
+            team_machine_name (str): cn of a team
+
+        Returns:
+        """
+        group_fqdn = f"cn={team_machine_name},{self.TEAMS_GROUP}"
         return self.make_uid_member_of(uid, group_fqdn)
 
     def remove_uid_member_of(self, uid, group_fqdn):
@@ -425,11 +449,156 @@ class LdapFranchiseMixin(object):
             self.create_franchise(code)
 
 
+class LdapTeamMixin(object):
+    """
+    Team is a posixGroup, child of organizationalUnit ou=teams that is just below the base DN.
+
+    Like division, team has machine and display names. A teams's DN begins with cn=,
+    e.g. the full team DN of a Polish publishing division is cn=PL-PUB,ou=teams,dc=entint,dc=org.
+    The description attribute of a team stores it's display name, e.g. Poland Publishing in this case.
+
+    The group's gidNumber is not important.
+    """
+
+    def get_teams(self, search=None):
+        """ Get objects (of posixGroup class) with organizational unit 'teams' by given search """
+        return self.get_objects(search=search, relative_pos='ou=teams', obj_class='posixGroup')
+
+    def get_team(self, name):
+        """
+        Get team by cname
+
+        Args:
+            name (str): team name
+
+        Returns:
+
+        """
+        return get_single_object(self.get_teams(f'cn={name}'))
+
+    def create_team(self, machine_name, display_name=None):
+        """
+        Create team
+
+        Args:
+            machine_name (str): team's cname
+            display_name (str): team's display name, stored in description
+
+        Returns:
+
+        """
+        display_name_bytes = display_name.encode('utf-8') if isinstance(display_name, str) else display_name
+        return self.create_group(name=machine_name, organizational_unit="teams", description=display_name_bytes)
+
+    def delete_team(self, machine_name):
+        """
+        Delete team by cname
+
+        Args:
+            machine_name (str): team's cname
+
+        Returns:
+        """
+        team_dn = f"cn={machine_name},{self.TEAMS_GROUP}"
+        return self.delete_object(team_dn)
+
+    @staticmethod
+    def make_team_display_name(franchise_name, division_name):
+        """
+        Compose team display name from franchise and division display names
+        Args:
+            franchise_name (str): display name of franchise
+            division_name (str): display name of division
+
+        Returns:
+        """
+        franchise_name = get_str(franchise_name)
+        division_name = get_str(division_name)
+        return "{} {}".format(franchise_name, division_name)
+
+    @staticmethod
+    def make_team_machine_name(franchise_name, division_name):
+        """
+        Compose team machine name from franchise and division machine names
+        Args:
+            franchise_name (str): machine name of franchise
+            division_name (str): machine name of division
+
+        Returns:
+        """
+        franchise_name = get_str(franchise_name)
+        division_name = get_str(division_name)
+        return "{}-{}".format(franchise_name, division_name)
+
+    def get_team_component_units(self, machine_name):
+        """
+        Get composing franchise and division from team cn
+        Args:
+            team (dict): ldap team
+
+        Returns:
+        """
+        franchise_name, division_name = get_str(machine_name).split('-', 1)
+        if not all([franchise_name, division_name]):
+            raise ObjectDoesNotExist
+        franchise = self.get_franchise(franchise_name)
+        division = self.get_division(division_name)
+        return franchise, division
+
+
 def ensure_org_sanity(edap, source):
     edap.create_all_divisions(source["divisions"])
     edap.create_all_franchises(source["franchises"])
     edap.create_org_unit("people", edap.ldap.PEOPLE_GROUP)
     edap.create_org_unit("people", edap.ldap.PEOPLE_GROUP)
+
+
+def get_not_matching_teams_by_cn(edap):
+    """
+    Get teams that not correspond to existing franchises and divisions by cn
+
+    Team cn must be constructed from existing division and franchise cns <franchise_cn>_<division_cn>
+    For example if there is PL-PUB team, then there needs to be a country PL and a division PUB
+    """
+    not_corresponding_teams = []
+    teams = edap.get_teams()
+    for team in teams:
+
+        team_machine_name = team['cn'][0]
+        try:
+            edap.get_team_component_units(team_machine_name)
+        except (ObjectDoesNotExist, MultipleObjectsFound):
+            not_corresponding_teams.append(team)
+            continue
+
+    return not_corresponding_teams
+
+
+def get_not_matching_teams_by_description(edap):
+    """
+    Get teams that not correspond to existing franchises and divisions by descriiption
+
+    Team description must be constructed from existing division and franchise descriptions
+    <franchise_description>_<division_description>
+    For example if there is Poland and Publishing, it should be 'Poland Publishing' team, but not 'Polish Publishing'
+    """
+    not_corresponding_teams = []
+    teams = edap.get_teams()
+    for team in teams:
+        team_machine_name = team['cn'][0]
+        team_display_name = get_str(team['description'][0])
+
+        try:
+            franchise, division = edap.get_team_component_units(team_machine_name)
+        except (ObjectDoesNotExist, MultipleObjectsFound):
+            not_corresponding_teams.append(team)
+            continue
+
+        expected_display_name = edap.make_team_display_name(franchise['description'][0], division['description'][0])
+        if team_display_name != expected_display_name:
+            not_corresponding_teams.append(team)
+
+    return not_corresponding_teams
 
 
 def update_parser(parser=None):
@@ -442,7 +611,7 @@ def update_parser(parser=None):
 
 
 class Edap(LdapObjectsMixin, LdapGroupMixin, OrganizationalUnitMixin, LdapUserMixin,
-           LdapFranchiseMixin, LdapDivisionMixin, LdapServiceMixin):
+           LdapTeamMixin, LdapFranchiseMixin, LdapDivisionMixin, LdapServiceMixin):
 
     def __init__(self, hostname, admin_cn, password, domain=None):
         if domain is None:
@@ -458,6 +627,8 @@ class Edap(LdapObjectsMixin, LdapGroupMixin, OrganizationalUnitMixin, LdapUserMi
         self.PEOPLE_GROUP = f"ou=people,{self.BASE_DN}"
         self.DIVISIONS = "ou=divisions"
         self.DIVISIONS_GROUP = f"{self.DIVISIONS},{self.BASE_DN}"
+        self.TEAMS = "ou=teams"
+        self.TEAMS_GROUP = f"{self.TEAMS},{self.BASE_DN}"
         self.FRANCHISE_GROUP_NAME = 'franchises'
         self.FRANCHISES = f"ou={self.FRANCHISE_GROUP_NAME}"
         self.FRANCHISES_GROUP = f"{self.FRANCHISES},{self.BASE_DN}"
