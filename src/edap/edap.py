@@ -416,16 +416,34 @@ class LdapFranchiseMixin(object):
         """
         return get_single_object(self.get_franchises(f'cn={code}'))
 
-    def create_franchise(self, code):
+    def create_franchise(self, machine_name, display_name=None):
         """
         Create franchise
+
+        If display name not given, it will be labeled with CLDR country display name
         Args:
-            code (str): country code
+            machine_name (str): country code, has to begin with valid ISO3166-1-Alpha-2 code
+            display_name (str): franchise display name
 
         Returns:
         """
-        description = self.label_franchise(code).encode("UTF-8")
-        return self.create_group(code, self.FRANCHISE_GROUP_NAME, description=description)
+        if display_name is None:
+            display_name = self.label_franchise(machine_name)
+        else:  # check code is valid and exists in Countries codes list
+            self.label_franchise(machine_name)
+        return self.create_group(machine_name, self.FRANCHISE_GROUP_NAME, description=display_name.encode('utf-8'))
+
+    def delete_franchise(self, machine_name):
+        """
+        Delete franchise by cname
+
+        Args:
+            machine_name (str): franchise's cname
+
+        Returns:
+        """
+        franchise_dn = f"cn={machine_name},{self.FRANCHISES_GROUP}"
+        return self.delete_object(franchise_dn)
 
     def label_franchise(self, code):
         """

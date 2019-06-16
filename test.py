@@ -211,6 +211,18 @@ def test_czech_franchise_becomes_present(edap):
     assert edap.get_franchise(franchise_cname)['description'][0] == franchise_description.encode('utf-8')
 
 
+def test_create_franchise_custom_name(edap):
+    franchise_cname = 'ua'
+    franchise_description = 'Franchise custom name'
+    with pytest.raises(ObjectDoesNotExist):
+        edap.get_franchise(franchise_cname)
+    edap.create_franchise(franchise_cname, franchise_description)
+    franchise = edap.get_franchise(franchise_cname)
+    assert franchise['description'][0] == franchise_description.encode('utf-8')
+
+    edap.delete_franchise(franchise_cname)
+
+
 def test_corresponding_teams(edap):
     """ test func to ensure that all existing teams correspond to countries and divisions """
     us_franchise_code = 'us'
