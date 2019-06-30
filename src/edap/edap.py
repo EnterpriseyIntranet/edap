@@ -250,6 +250,10 @@ class LdapUserMixin(object):
         group_fqdn = f"cn={franchise_name},{self.FRANCHISES_GROUP}"
         return self.remove_uid_member_of(uid, group_fqdn)
 
+    def remove_uid_member_of_team(self, uid, team_name):
+        group_fqdn = f"cn={team_name},{self.TEAMS_GROUP}"
+        return self.remove_uid_member_of(uid, group_fqdn)
+
     def delete_user(self, uid):
         return self.delete_object(f"uid={uid},{self.PEOPLE_GROUP}")
 
