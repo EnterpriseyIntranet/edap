@@ -355,19 +355,19 @@ class LdapDivisionMixin(object):
 
     def get_divisions(self, search=None):
         """ Get objects (of posixGroup class) with organizational unit 'divisions' by given search """
-        return self.get_objects(search=search, relative_pos='ou=divisions', obj_class='posixGroup')
+        return self.get_groups(search=search, organizational_unit=self.DIVISIONS_GROUP_NAME)
 
-    def get_division(self, name):
+    def get_division(self, machine_name):
         """
         Get division by cname
 
         Args:
-            name (str): division name
+            machine_name (str): division name
 
         Returns:
 
         """
-        return get_single_object(self.get_divisions(f'cn={name}'))
+        return get_single_object(self.get_divisions(f'cn={machine_name}'))
 
     def create_division(self, machine_name, display_name=None):
         """
@@ -396,8 +396,7 @@ class LdapDivisionMixin(object):
 
         Returns:
         """
-        division_dn = f"cn={machine_name},{self.DIVISIONS_GROUP}"
-        return self.delete_object(division_dn)
+        return self.delete_group(cname=machine_name, organizational_unit=self.DIVISIONS_GROUP_NAME)
 
 
 class LdapFranchiseMixin(object):
@@ -408,7 +407,7 @@ class LdapFranchiseMixin(object):
     """
 
     def get_franchises(self, search=None):
-        return self.get_subobjects(self.FRANCHISES, search, obj_class='posixGroup')
+        return self.get_groups(search=search, organizational_unit=self.FRANCHISES_GROUP_NAME)
 
     def get_franchise(self, code):
         """
@@ -435,7 +434,7 @@ class LdapFranchiseMixin(object):
             display_name = self.label_franchise(machine_name)
         else:  # check code is valid and exists in Countries codes list
             self.label_franchise(machine_name)
-        return self.create_group(machine_name, self.FRANCHISE_GROUP_NAME, description=display_name.encode('utf-8'))
+        return self.create_group(machine_name, self.FRANCHISES_GROUP_NAME, description=display_name.encode('utf-8'))
 
     def delete_franchise(self, machine_name):
         """
@@ -446,8 +445,7 @@ class LdapFranchiseMixin(object):
 
         Returns:
         """
-        franchise_dn = f"cn={machine_name},{self.FRANCHISES_GROUP}"
-        return self.delete_object(franchise_dn)
+        return self.delete_group(cname=machine_name, organizational_unit=self.FRANCHISES_GROUP_NAME)
 
     def label_franchise(self, code):
         """
@@ -484,7 +482,7 @@ class LdapTeamMixin(object):
 
     def get_teams(self, search=None):
         """ Get objects (of posixGroup class) with organizational unit 'teams' by given search """
-        return self.get_objects(search=search, relative_pos='ou=teams', obj_class='posixGroup')
+        return self.get_groups(search=search, organizational_unit=self.TEAMS_GROUP_NAME)
 
     def get_team(self, name):
         """
@@ -521,8 +519,7 @@ class LdapTeamMixin(object):
 
         Returns:
         """
-        team_dn = f"cn={machine_name},{self.TEAMS_GROUP}"
-        return self.delete_object(team_dn)
+        return self.delete_group(machine_name, organizational_unit=self.TEAMS_GROUP_NAME)
 
     @staticmethod
     def make_team_display_name(franchise_name, division_name):
@@ -647,15 +644,22 @@ class Edap(LdapObjectsMixin, LdapGroupMixin, OrganizationalUnitMixin, LdapUserMi
         self.ldap.bind_s(admin_dn, password)
 
         self.PEOPLE_GROUP = f"ou=people,{self.BASE_DN}"
-        self.DIVISIONS = "ou=divisions"
-        self.DIVISIONS_GROUP = f"{self.DIVISIONS},{self.BASE_DN}"
-        self.TEAMS = "ou=teams"
-        self.TEAMS_GROUP = f"{self.TEAMS},{self.BASE_DN}"
-        self.FRANCHISE_GROUP_NAME = 'franchises'
-        self.FRANCHISES = f"ou={self.FRANCHISE_GROUP_NAME}"
-        self.FRANCHISES_GROUP = f"{self.FRANCHISES},{self.BASE_DN}"
-        self.SERVICES = "ou=services"
-        self.SERVICES_GROUP = f"{self.SERVICES},{self.BASE_DN}"
+
+        self.DIVISIONS_GROUP_NAME = "divisions"
+        self.DIVISIONS_OU = f"ou={self.DIVISIONS_GROUP_NAME}"
+        self.DIVISIONS_GROUP = f"{self.DIVISIONS_OU},{self.BASE_DN}"
+
+        self.TEAMS_GROUP_NAME = "teams"
+        self.TEAMS_OU = f"ou={self.TEAMS_GROUP_NAME}"
+        self.TEAMS_GROUP = f"{self.TEAMS_OU},{self.BASE_DN}"
+
+        self.FRANCHISES_GROUP_NAME = 'franchises'
+        self.FRANCHISES_OU = f"ou={self.FRANCHISES_GROUP_NAME}"
+        self.FRANCHISES_GROUP = f"{self.FRANCHISES_OU},{self.BASE_DN}"
+
+        self.SERVICES_GROUP_NAME = "services"
+        self.SERVICES_OU = f"ou={self.SERVICES_GROUP_NAME}"
+        self.SERVICES_GROUP = f"{self.SERVICES_OU},{self.BASE_DN}"
 
     def add_s(self, *args, **kwargs):
         return self.ldap.add_s(*args, **kwargs)

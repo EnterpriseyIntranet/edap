@@ -203,9 +203,9 @@ def test_label_franchise(edap):
 def test_czech_franchise_becomes_present(edap):
     franchise_cname = 'cz_prg'
     franchise_description = 'Czechia'
-    assert not edap.subobject_exists_at(f"cn={franchise_cname},{edap.FRANCHISES}", "posixGroup")
+    assert not edap.subobject_exists_at(f"cn={franchise_cname},{edap.FRANCHISES_OU}", "posixGroup")
     edap.create_franchise(franchise_cname)
-    assert edap.subobject_exists_at(f"cn={franchise_cname},{edap.FRANCHISES}", "posixGroup")
+    assert edap.subobject_exists_at(f"cn={franchise_cname},{edap.FRANCHISES_OU}", "posixGroup")
     assert edap.object_exists(f"&(commonName={franchise_cname})(description={franchise_description})", "posixGroup")
     assert edap.get_franchise(franchise_cname)['cn'][0] == franchise_cname.encode('utf-8')
     assert edap.get_franchise(franchise_cname)['description'][0] == franchise_description.encode('utf-8')
