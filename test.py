@@ -114,7 +114,7 @@ def test_delete_group(edap):
 
 def test_delete_user(edap):
     uid = 'userToDelete'
-    edap.add_user(uid, 'test_name', 'test_surname', 'testpassword')
+    edap.add_user(uid, 'test_name', 'test_surname', 'testpassword', "foo@bar.com")
     assert edap.get_user(uid)
     edap.delete_user(uid)
     with pytest.raises(ObjectDoesNotExist):
@@ -134,7 +134,7 @@ def test_get_users(edap):
     """ Test LdapUserMixin's get_users, get_user methods """
     user_id = 'testUser'
     assert len(edap.get_users(search=f"uid={user_id}")) == 0
-    edap.add_user(user_id, 'test', 'test', 'testPassword')
+    edap.add_user(user_id, 'test', 'test', 'testPassword', "foo@bar.com")
     assert len(edap.get_users(search=f"uid={user_id}")) == 1
     assert edap.get_user(user_id) == edap.get_users(search=f"uid={user_id}")[0]
 
@@ -143,7 +143,7 @@ def test_get_user_groups(edap):
     """ Test LdapUserMixin's get_user_groups method """
     user_id = 'testUserGroups'
     group_name = 'test_user_groups'
-    edap.add_user(user_id, 'test', 'test', 'testPassword')
+    edap.add_user(user_id, 'test', 'test', 'testPassword', "foo@bar.com")
     edap.create_division(group_name)
     assert len(edap.get_user_groups(user_id)) == 0
     edap.make_uid_member_of(user_id, f'cn={group_name},{edap.DIVISIONS_GROUP}')
@@ -153,7 +153,7 @@ def test_get_user_groups(edap):
 
 def test_user_becomes_present(edap):
     assert not edap.user_of_uid_exists("kohout")
-    edap.add_user("kohout", "Kohutik", "Pestry", "kohuticek")
+    edap.add_user("kohout", "Kohutik", "Pestry", "kohuticek", "foo@bar.com")
     assert edap.user_of_uid_exists("kohout")
 
 

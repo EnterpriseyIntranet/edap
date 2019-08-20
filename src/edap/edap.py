@@ -120,12 +120,12 @@ class LdapObjectsMixin(object):
 
 class LdapUserMixin(object):
 
-    def add_user(self, uid, name, surname, password):
+    def add_user(self, uid, name, surname, password, mail):
         if self.subobject_exists_at("ou=people", "organizationalUnit") == 0:
             raise ConstraintError(f"The people group '{self.PEOPLE_GROUP}' doesn't exist.")
         if self.user_of_uid_exists(uid) > 0:
             raise ConstraintError(f"User of uid '{uid}' already exists.")
-        modlist = self.mk_add_user_modlist(uid, name, surname, password)
+        modlist = self.mk_add_user_modlist(uid, name, surname, password, mail)
         self.add_s(f"uid={uid},{self.PEOPLE_GROUP}", modlist)
 
     def get_users(self, search=None):
@@ -161,8 +161,8 @@ class LdapUserMixin(object):
         search = f"(&(memberUid={uid})(objectClass=posixGroup))"
         return transform_ldap_response(self.search_s(self.BASE_DN, ldap.SCOPE_SUBTREE, search))
 
-    def mk_add_user_modlist(self, uid, name, surname, password):
-        mail = f"{uid}@example.com".encode("ASCII")
+    def mk_add_user_modlist(self, uid, name, surname, password, mail):
+        mail = mail.encode("ASCII")
         dic = dict(
             uid=uid.encode("ASCII"), givenName=name.encode("UTF-8"),
             mail=mail, objectclass=(b"inetOrgPerson", b"top"),
