@@ -1,7 +1,9 @@
 version: '3'
 services:
   openldap:
-    image: osixia/openldap
+    build:
+      dockerfile: Dockerfile-ldap
+      context: .
     environment:
       LDAP_DOMAIN: ${DOMAIN}
       LDAP_ADMIN_PASSWORD: ${ADMIN_PASSWORD}

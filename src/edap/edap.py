@@ -120,12 +120,12 @@ class LdapObjectsMixin(object):
 
 class LdapUserMixin(object):
 
-    def add_user(self, uid, name, surname, password, mail):
+    def add_user(self, uid, name, surname, password, mail, picture_bytes=b""):
         if self.subobject_exists_at("ou=people", "organizationalUnit") == 0:
             raise ConstraintError(f"The people group '{self.PEOPLE_GROUP}' doesn't exist.")
         if self.user_of_uid_exists(uid) > 0:
             raise ConstraintError(f"User of uid '{uid}' already exists.")
-        modlist = self.mk_add_user_modlist(uid, name, surname, password, mail)
+        modlist = self._mk_add_user_modlist(uid, name, surname, password, mail, picture_bytes)
         self.add_s(f"uid={uid},{self.PEOPLE_GROUP}", modlist)
 
     def get_users(self, search=None):
@@ -161,14 +161,19 @@ class LdapUserMixin(object):
         search = f"(&(memberUid={uid})(objectClass=posixGroup))"
         return transform_ldap_response(self.search_s(self.BASE_DN, ldap.SCOPE_SUBTREE, search))
 
-    def mk_add_user_modlist(self, uid, name, surname, password, mail):
+    def _mk_add_user_dict(self, uid, name, surname, password, mail, picture_bytes):
         mail = mail.encode("ASCII")
         dic = dict(
             uid=uid.encode("ASCII"), givenName=name.encode("UTF-8"),
-            mail=mail, objectclass=(b"inetOrgPerson", b"top"),
+            mail=mail, objectClass=(b"inetOrgPerson", b"top"),
             sn=surname.encode("UTF-8"), userPassword=_hashPassword(password),
             cn=f"{name} {surname}".encode("UTF-8"),
+            jpegPhoto=picture_bytes,
         )
+        return dic
+
+    def _mk_add_user_modlist(self, uid, name, surname, password, mail, picture_bytes):
+        dic = self._mk_add_user_dict(uid, name, surname, password, mail, picture_bytes)
         modlist = ldap.modlist.addModlist(dic)
         return modlist
 
@@ -258,12 +263,31 @@ class LdapUserMixin(object):
         return self.delete_object(f"uid={uid},{self.PEOPLE_GROUP}")
 
 
+class LdapPostfixUserMixin(LdapUserMixin):
+    MAIL_GID = 5000
+    MAIL_UID = 5000
+    HOME_FORMAT_STR = "/var/mail/mail.cspii.org/{uid}"
+
+    def _mk_add_user_dict(self, uid, name, surname, password, mail, picture_bytes):
+        dic = super()._mk_add_user_dict(uid, name, surname, password, mail, picture_bytes)
+        postfix_dic = dict(
+            mailEnabled=b"TRUE",
+            mailGidNumber=str(self.MAIL_GID).encode("ASCII"),
+            mailUidNumber=str(self.MAIL_UID).encode("ASCII"),
+            mailHomeDirectory=self.HOME_FORMAT_STR.format(
+                uid=uid, name=name, surname=surname, mail=mail).encode("ASCII"),
+        )
+        dic.update(postfix_dic)
+        dic["objectClass"] += (b"postfixBookMailAccount",)
+        return dic
+
+
 class OrganizationalUnitMixin(object):
 
     def create_org_unit(self, name, fqdn):
         dic = dict(
              ou=name.encode("ASCII"),
-             objectclass=(b"organizationalUnit", b"top"),
+             objectClass=(b"organizationalUnit", b"top"),
         )
         modlist = ldap.modlist.addModlist(dic)
         self.add_s(fqdn, modlist)
@@ -312,7 +336,7 @@ class LdapGroupMixin(object):
 
     def create_group_dict(self, name):
         dic = dict(
-            cn=name.encode("ASCII"), objectclass=(b"posixGroup", b"top"), gidNumber=b"500",
+            cn=name.encode("ASCII"), objectClass=(b"posixGroup", b"top"), gidNumber=b"500",
         )
         return dic
 
@@ -629,7 +653,7 @@ def update_parser(parser=None):
     return parser
 
 
-class Edap(LdapObjectsMixin, LdapGroupMixin, OrganizationalUnitMixin, LdapUserMixin,
+class Edap(LdapObjectsMixin, LdapGroupMixin, OrganizationalUnitMixin, LdapPostfixUserMixin,
            LdapTeamMixin, LdapFranchiseMixin, LdapDivisionMixin, LdapServiceMixin):
 
     def __init__(self, hostname, admin_cn, password, domain=None):
