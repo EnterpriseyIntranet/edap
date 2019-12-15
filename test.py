@@ -10,7 +10,7 @@ import pytest
 sys.path.insert(0, join(dirname(__file__), 'src'))
 
 from edap import Edap, ConstraintError, get_single_object, ldap_tuple_to_object, import_data, ObjectDoesNotExist, \
-    MultipleObjectsFound, get_not_matching_teams_by_cn, get_not_matching_teams_by_description
+    MultipleObjectsFound, get_not_matching_teams_by_cn, get_not_matching_teams_by_description, ensure_org_sanity
 
 DOMAIN = os.environ.get("DOMAIN")
 ADMIN_CN = "cn=admin"
@@ -69,25 +69,30 @@ def test_get_groups(edap):
 
 def test_blank(edap):
     assert not edap.subobject_exists_at(f"ou=people", "organizationalUnit")
-    edap.create_org_unit("people", edap.PEOPLE_GROUP)
+    edap.create_org_unit("people")
     assert edap.subobject_exists_at("ou=people", "organizationalUnit",)
     assert not edap.subobject_exists_at("ou=people", "foobar")
+    edap.delete_org_unit("people")
+    assert not edap.subobject_exists_at("ou=people", "organizationalUnit",)
 
 
 def test_divisions_becomes_present(edap):
     assert not edap.org_unit_exists("divisions")
-    edap.create_org_unit("ou=divisions", edap.DIVISIONS_GROUP)
+    edap.create_org_unit("divisions")
     assert edap.org_unit_exists("divisions")
+    edap.delete_org_unit("divisions")
+    assert not edap.org_unit_exists("divisions")
 
 
 def test_get_objects(edap):
     """ Test LdapObjectsMixin's get_objects, get_object methods """
     org_unit = "testObjects"
     assert len(edap.get_objects(search=f"ou={org_unit}", obj_class="organizationalUnit")) == 0
-    edap.create_org_unit(f"{org_unit}", f"ou={org_unit},{edap.BASE_DN}")
+    edap.create_org_unit(f"{org_unit}")
     assert edap.get_objects(relative_pos=f"ou={org_unit}") == edap.get_objects(relative_pos=f"ou={org_unit}")
     assert len(edap.get_subobjects(relative_pos=f"ou={org_unit}", obj_class="organizationalUnit")) == 1
     assert not edap.get_subobjects(f"ou={org_unit}", search="cname=foobar")
+    edap.delete_org_unit(f"{org_unit}")
 
 
 def test_delete_object(edap):
@@ -114,6 +119,7 @@ def test_delete_group(edap):
 
 def test_delete_user(edap):
     uid = 'userToDelete'
+    edap.ensure_org_unit_exists("people")
     edap.add_user(uid, 'test_name', 'test_surname', 'testpassword', "foo@bar.com")
     assert edap.get_user(uid)
     edap.delete_user(uid)
@@ -134,6 +140,7 @@ def test_get_users(edap):
     """ Test LdapUserMixin's get_users, get_user methods """
     user_id = 'testUser'
     assert len(edap.get_users(search=f"uid={user_id}")) == 0
+    edap.ensure_org_unit_exists("people")
     edap.add_user(user_id, 'test', 'test', 'testPassword', "foo@bar.com")
     assert len(edap.get_users(search=f"uid={user_id}")) == 1
     assert edap.get_user(user_id) == edap.get_users(search=f"uid={user_id}")[0]
@@ -143,6 +150,7 @@ def test_get_user_groups(edap):
     """ Test LdapUserMixin's get_user_groups method """
     user_id = 'testUserGroups'
     group_name = 'test_user_groups'
+    edap.ensure_org_unit_exists("people")
     edap.add_user(user_id, 'test', 'test', 'testPassword', "foo@bar.com")
     edap.create_division(group_name)
     assert len(edap.get_user_groups(user_id)) == 0

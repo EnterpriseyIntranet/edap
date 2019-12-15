@@ -284,33 +284,58 @@ class LdapPostfixUserMixin(LdapUserMixin):
 
 class OrganizationalUnitMixin(object):
 
-    def create_org_unit(self, name, fqdn):
+    def create_org_unit(self, name, base=None):
+        if base is None:
+            base = self.BASE_DN
+
+        dn = f"ou={name}"
+        fqdn = f"{dn},{base}"
+
         dic = dict(
-             ou=name.encode("ASCII"),
+             ou=dn.encode("ASCII"),
              objectClass=(b"organizationalUnit", b"top"),
         )
         modlist = ldap.modlist.addModlist(dic)
         self.add_s(fqdn, modlist)
 
-    def get_org_unit(self, organizational_unit):
-        return self.get_objects(search=f'ou={organizational_unit}')
+    def delete_org_unit(self, name, base=None):
+        if base is None:
+            base = self.BASE_DN
 
-    def org_unit_exists(self, organizational_unit):
-        return self.subobject_exists_at(f"ou={organizational_unit}", "organizationalUnit")
+        self.delete_object(f"ou={name},{base}")
+
+    def ensure_org_unit_exists(self, name, base=None):
+        if base is None:
+            base = self.BASE_DN
+
+        if not self.org_unit_exists(name):
+            self.create_org_unit(name)
+
+    def get_org_unit(self, name):
+        return self.get_objects(search=f'ou={name}')
+
+    def org_unit_exists(self, name):
+        return self.subobject_exists_at(f"ou={name}", "organizationalUnit")
 
 
 class LdapGroupMixin(object):
 
     def create_group(self, name, organizational_unit, description=None):
-        org_unit = f"ou={organizational_unit}"
-        if not self.org_unit_exists(organizational_unit):
-            self.create_org_unit(org_unit, f"{org_unit},{self.BASE_DN}")
+        org_unit_dn = f"ou={organizational_unit}"
+        self.ensure_org_unit_exists(organizational_unit)
         if self.group_exists(name, organizational_unit):
             raise ConstraintError("Group with such name under this organizational unit already exists")
         dic = self.create_group_dict(f"{name}")
         if description:
             dic['description'] = description
-        return self.create_group_from_dict(f"cn={name},{org_unit},{self.BASE_DN}", dic)
+        return self.create_group_from_dict(f"cn={name},{org_unit_dn},{self.BASE_DN}", dic)
+
+    def ensure_group_exists(self, name, organizational_unit, description=None):
+        try:
+            self.create_group(name, organizational_unit, description)
+        except ConstraintError as exc:
+            if "already exists" not in str(exc):
+                raise
 
     def get_groups(self, search=None, organizational_unit=None):
         """
@@ -589,11 +614,18 @@ class LdapTeamMixin(object):
         return franchise, division
 
 
-def ensure_org_sanity(edap, source):
-    edap.create_all_divisions(source["divisions"])
-    edap.create_all_franchises(source["franchises"])
-    edap.create_org_unit("people", edap.ldap.PEOPLE_GROUP)
-    edap.create_org_unit("people", edap.ldap.PEOPLE_GROUP)
+def ensure_org_sanity(edap, source=None):
+    if source is None:
+        source = dict()
+
+    edap.ensure_org_unit_exists(edap.FRANCHISES_GROUP_NAME)
+    edap.ensure_org_unit_exists(edap.DIVISIONS_GROUP_NAME)
+    edap.ensure_org_unit_exists(edap.SERVICES_GROUP_NAME)
+    edap.ensure_org_unit_exists(edap.TEAMS_GROUP_NAME)
+    edap.ensure_org_unit_exists("people")
+
+    edap.create_all_divisions(source.get("divisions", []))
+    edap.create_all_franchises(source.get("franchises", []))
 
 
 def get_not_matching_teams_by_cn(edap):
