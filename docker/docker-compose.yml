@@ -11,6 +11,10 @@ services:
       LDAP_READONLY_USER: "true"
       LDAP_READONLY_USER_USERNAME: ${READER_UID}
       LDAP_READONLY_USER_PASSWORD: ${READER_PASS}
+    networks:
+      ldap-backend:
+        aliases:
+          - ldap
 
   python:
     build:
@@ -21,5 +25,22 @@ services:
       LDAP_ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     volumes:
       - ..:/work
-    links:
-      - openldap:ldap
+    depends_on:
+      - openldap
+    networks:
+      ldap-backend:
+
+  phpldapadmin:
+    image: osixia/phpldapadmin
+    ports:
+      - "8080:80"
+    environment:
+      PHPLDAPADMIN_LDAP_HOSTS: "ldap"
+      PHPLDAPADMIN_HTTPS=false:
+    depends_on:
+      - openldap
+    networks:
+      ldap-backend:
+
+networks:
+  ldap-backend:
