@@ -84,6 +84,69 @@ def test_divisions_becomes_present(edap):
     assert not edap.org_unit_exists("divisions")
 
 
+def test_special_becomes_present(edap):
+    assert not edap.org_unit_exists("special")
+    edap.create_org_unit("special")
+    assert edap.org_unit_exists("special")
+    edap.delete_org_unit("special")
+    assert not edap.subobject_exists_at("ou=special", "organizationalUnit", )
+
+
+def test_presidium_special_becomes_present(edap):
+    description = b'presidium'
+    presidium = "presidium"
+    assert not edap.object_exists_at(f"cn={presidium},{edap.SPECIAL_GROUP}", "posixGroup")
+    edap.create_special(presidium, display_name=presidium)
+    assert edap.object_exists_at(f"cn={presidium},{edap.SPECIAL_GROUP}", "posixGroup")
+    res = edap.get_special(presidium)
+    assert description in res['description']
+
+
+def test_ddea_becomes_present(edap):
+    assert not edap.org_unit_exists("ddea")
+    edap.create_org_unit("ddea")
+    assert edap.org_unit_exists("ddea")
+
+
+def test_it_ddea_becomes_present(edap):
+    description = b'it'
+    assert not edap.object_exists_at(f"cn=it,{edap.DDEA_GROUP}", "posixGroup")
+    edap.create_ddea("it", display_name="it")
+    assert edap.object_exists_at(f"cn=it,{edap.DDEA_GROUP}", "posixGroup")
+    res = edap.get_ddea("it")
+    assert description in res['description']
+
+
+def test_cdea_becomes_present(edap):
+    assert not edap.org_unit_exists("cdea")
+    edap.create_org_unit("cdea")
+    assert edap.org_unit_exists("cdea")
+
+
+def test_cz_cdea_becomes_present(edap):
+    description = b'cz'
+    assert not edap.object_exists_at(f"cn=cz,{edap.CDEA_GROUP}", "posixGroup")
+    edap.create_cdea("cz", display_name="cz")
+    assert edap.object_exists_at(f"cn=cz,{edap.CDEA_GROUP}", "posixGroup")
+    res = edap.get_cdea("cz")
+    assert description in res['description']
+
+
+def test_lm_becomes_present(edap):
+    assert not edap.org_unit_exists("lm")
+    edap.create_org_unit("lm")
+    assert edap.org_unit_exists("lm")
+
+
+def test_cz_res_lm_becomes_present(edap):
+    description = b'cz-res'
+    assert not edap.object_exists_at(f"cn=cz-res,{edap.LM_GROUP}", "posixGroup")
+    edap.create_lm("cz-res", display_name="cz-res")
+    assert edap.object_exists_at(f"cn=cz-res,{edap.LM_GROUP}", "posixGroup")
+    res = edap.get_lm("cz-res")
+    assert description in res['description']
+
+
 def test_get_objects(edap):
     """ Test LdapObjectsMixin's get_objects, get_object methods """
     org_unit = "testObjects"
