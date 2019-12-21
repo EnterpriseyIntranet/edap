@@ -13,7 +13,7 @@ This project aims to make the user/group management and import/export operations
 ## Tests
 
 1. Go into the `docker` directory, execute `docker-compose up -d python`
-1. When everything finishes, run `bash exec_test.py` in there.
+1. When everything finishes, run `bash exec_test.sh` in there.
 1. First run may fail, so call the script again. You are set now!
 
 ## Requirements
