@@ -13,8 +13,9 @@ This project aims to make the user/group management and import/export operations
 ## Tests
 
 1. Go into the `docker` directory, execute `docker-compose up -d python`
-1. When everything finishes, run `bash exec_test.py` in there.
-1. First run may fail, so call the script again. You are set now!
+2. When everything finishes, run `bash renew_ldap.sh` in there.
+3. For test run `bash exec_test.sh`
+4. Before each test `renew_ldap.sh` must be run, for ldap to be clean. You are set now!
 
 ## Requirements
 

@@ -88,6 +88,7 @@ def test_special_becomes_present(edap):
     assert not edap.org_unit_exists("special")
     edap.create_org_unit("special")
     assert edap.org_unit_exists("special")
+<<<<<<< HEAD
     edap.delete_org_unit("special")
     assert not edap.subobject_exists_at("ou=special", "organizationalUnit",)
 
@@ -99,6 +100,22 @@ def test_presidium_special_becomes_present(edap):
     edap.create_special(machine_name=presidium, display_name="Presidium")
     assert edap.object_exists_at(f"cn={presidium},{edap.SPECIAL_GROUP}", "posixGroup")
     res = edap.get_special(presidium)
+=======
+
+
+def test_presidium_special_becomes_present(edap):
+    description = b'presidium'
+    presidium = "presidium"
+    special = "special"
+    # print("test_presidium_special_becomes_present begin:", f"cn={presidium},{edap.SPECIAL_GROUP}", "posixGroup")
+    # print("edap.object_exists_at", f"cn={presidium},{edap.SPECIAL_GROUP}", "posixGroup", "=", edap.object_exists_at(f"cn={presidium},{edap.SPECIAL_GROUP}", "posixGroup"))
+    assert not edap.object_exists_at(f"cn={presidium},{edap.SPECIAL_GROUP}", "posixGroup")
+    edap.create_special(presidium, display_name=presidium)
+    # print("edap.object_exists_at", f"cn={presidium},{edap.SPECIAL_GROUP}", "posixGroup", "=", edap.object_exists_at(f"cn={presidium},{edap.SPECIAL_GROUP}", "posixGroup"))
+    assert edap.object_exists_at(f"cn={presidium},{edap.SPECIAL_GROUP}", "posixGroup")
+    res = edap.get_special(presidium)
+    # print("edap.get_special(presidium)", res)
+>>>>>>> daebc4b... exec_test.sh wwas divided to exec_test.sh and renew_ldap.sh for improving of reliability. Readme.md was updated accordingly, Added ddea,cdea,special and lm groups with basic tests.
     assert description in res['description']
 
 

@@ -10,4 +10,4 @@ RUN pip install python-ldap pytest
 
 WORKDIR /work
 
-CMD ["py.test", "test.py"]
+CMD ["py.test", "test.py","-s"]
