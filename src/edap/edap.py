@@ -292,8 +292,8 @@ class OrganizationalUnitMixin(object):
         fqdn = f"{dn},{base}"
 
         dic = dict(
-             ou=dn.encode("ASCII"),
-             objectClass=(b"organizationalUnit", b"top"),
+            ou=dn.encode("ASCII"),
+            objectClass=(b"organizationalUnit", b"top"),
         )
         modlist = ldap.modlist.addModlist(dic)
         self.add_s(fqdn, modlist)
@@ -389,6 +389,238 @@ class LdapServiceMixin(object):
 
     def create_service(self, name):
         return self.create_group(name=name, organizational_unit="services")
+
+
+class LdapSpecialMixin(object):
+    """
+    Special is a posixGroup, child of organizationalUnit ou=special that is just below the base DN.
+
+    A special has machine and display names. A special's DN begins with cn=<machine name>,
+    e.g. the full special DN of a presidium special is cn=presidium,ou=special,dc=entint,dc=org.
+    There are also cn=board and cn=everyone in the special ou.
+    The description attribute of a special stores it's display name, e.g. Presidium in this case.
+
+    The group's gidNumber is not important.
+    """
+
+    def get_specials(self, search=None):
+        """ Get objects (of posixGroup class) with organizational unit 'special' by given search """
+        return self.get_groups(search=search, organizational_unit=self.SPECIAL_GROUP_NAME)
+
+    def get_special(self, machine_name):
+        """
+        Get special by cname
+
+        Args:
+            machine_name (str): special name
+
+        Returns:
+
+        """
+        return get_single_object(self.get_specials(f'cn={machine_name}'))
+
+    def create_special(self, machine_name, display_name=None):
+        """
+        Create special
+
+        Args:
+            machine_name (str): special's cname
+            display_name (str): special's display name, stored in description
+
+        Returns:
+
+        """
+        display_name_bytes = display_name.encode('utf-8') if isinstance(display_name, str) else display_name
+        return self.create_group(name=machine_name, organizational_unit="special", description=display_name_bytes)
+
+    def create_all_specials(self, source):
+        for dname in source:
+            self.create_special(dname)
+
+    def delete_special(self, machine_name):
+        """
+        Delete special by cname
+
+        Args:
+            machine_name (str): special's cname
+
+        Returns:
+        """
+        return self.delete_group(cname=machine_name, organizational_unit=self.SPECIAL_GROUP_NAME)
+
+
+class LdapDdeaMixin(object):
+    """
+    Ddea is a posixGroup, child of organizationalUnit ou=ddea that is just below the base DN.
+
+    A ddea has machine and display names. A ddea's DN begins with cn=<machine name>,
+    e.g. the full ddea DN of a it ddea is cn=it,ou=ddea,dc=entint,dc=org.
+    There are also cn=res and cn=mar etc in the ddea ou.
+    The description attribute of a ddea stores it's display name, e.g. Publishing in this case.
+
+    The group's gidNumber is not important.
+    """
+
+    def get_ddeas(self, search=None):
+        """ Get objects (of posixGroup class) with organizational unit 'ddea' by given search """
+        return self.get_groups(search=search, organizational_unit=self.DDEA_GROUP_NAME)
+
+    def get_ddea(self, machine_name):
+        """
+        Get ddea by cname
+
+        Args:
+            machine_name (str): ddea name
+
+        Returns:
+
+        """
+        return get_single_object(self.get_ddeas(f'cn={machine_name}'))
+
+    def create_ddea(self, machine_name, display_name=None):
+        """
+        Create ddea
+
+        Args:
+            machine_name (str): ddea's cname
+            display_name (str): ddea's display name, stored in description
+
+        Returns:
+
+        """
+        display_name_bytes = display_name.encode('utf-8') if isinstance(display_name, str) else display_name
+        return self.create_group(name=machine_name, organizational_unit="ddea", description=display_name_bytes)
+
+    def create_all_ddeas(self, source):
+        for dname in source:
+            self.create_ddea(dname)
+
+    def delete_ddea(self, machine_name):
+        """
+        Delete ddea by cname
+
+        Args:
+            machine_name (str): ddea's cname
+
+        Returns:
+        """
+        return self.delete_group(cname=machine_name, organizational_unit=self.DDEA_GROUP_NAME)
+
+
+class LdapCdeaMixin(object):
+    """
+    Cdea is a posixGroup, child of organizationalUnit ou=cdea that is just below the base DN.
+
+    A cdea has machine and display names. A cdea's DN begins with cn=<machine name>,
+    e.g. the full cdea DN of a cz cdea is cn=cz,ou=cdea,dc=entint,dc=org.
+    There are also cn=cz and cn=sk etc in the lm ou.
+    The description attribute of a cdea stores it's display name, e.g. Novak in this case.
+
+    The group's gidNumber is not important.
+    """
+
+    def get_cdeas(self, search=None):
+        """ Get objects (of posixGroup class) with organizational unit 'cdea' by given search """
+        return self.get_groups(search=search, organizational_unit=self.CDEA_GROUP_NAME)
+
+    def get_cdea(self, machine_name):
+        """
+        Get cdea by cname
+
+        Args:
+            machine_name (str): cdea name
+
+        Returns:
+
+        """
+        return get_single_object(self.get_cdeas(f'cn={machine_name}'))
+
+    def create_cdea(self, machine_name, display_name=None):
+        """
+        Create cdea
+
+        Args:
+            machine_name (str): cdea's cname
+            display_name (str): cdea's display name, stored in description
+
+        Returns:
+
+        """
+        display_name_bytes = display_name.encode('utf-8') if isinstance(display_name, str) else display_name
+        return self.create_group(name=machine_name, organizational_unit="cdea", description=display_name_bytes)
+
+    def create_all_cdeas(self, source):
+        for dname in source:
+            self.create_cdea(dname)
+
+    def delete_cdea(self, machine_name):
+        """
+        Delete cdea by cname
+
+        Args:
+            machine_name (str): cdea's cname
+
+        Returns:
+        """
+        return self.delete_group(cname=machine_name, organizational_unit=self.CDEA_GROUP_NAME)
+
+
+class LdapLmMixin(object):
+    """
+    lm is a posixGroup, child of organizationalUnit ou=lm that is just below the base DN.
+
+    A lm has machine and display names. A lm's DN begins with cn=<machine name>,
+    e.g. the full lm DN of a it lm is cn=it,ou=lm,dc=entint,dc=org.
+    There are also cn=cz-res and cn=sk-mar etc in the lm ou.
+    The description attribute of a lm stores it's display name, e.g. Publishing in this case.
+
+    The group's gidNumber is not important.
+    """
+
+    def get_lms(self, search=None):
+        """ Get objects (of posixGroup class) with organizational unit 'lm' by given search """
+        return self.get_groups(search=search, organizational_unit=self.LM_GROUP_NAME)
+
+    def get_lm(self, machine_name):
+        """
+        Get lm by cname
+
+        Args:
+            machine_name (str): lm name
+
+        Returns:
+
+        """
+        return get_single_object(self.get_lms(f'cn={machine_name}'))
+
+    def create_lm(self, machine_name, display_name=None):
+        """
+        Create lm
+
+        Args:
+            machine_name (str): lm's cname
+            display_name (str): lm's display name, stored in description
+
+        Returns:
+
+        """
+        display_name_bytes = display_name.encode('utf-8') if isinstance(display_name, str) else display_name
+        return self.create_group(name=machine_name, organizational_unit="lm", description=display_name_bytes)
+
+    def create_all_lms(self, source):
+        for dname in source:
+            self.create_lm(dname)
+
+    def delete_lm(self, machine_name):
+        """
+        Delete lm by cname
+
+        Args:
+            machine_name (str): lm's cname
+
+        Returns:
+        """
+        return self.delete_group(cname=machine_name, organizational_unit=self.LM_GROUP_NAME)
 
 
 class LdapDivisionMixin(object):
@@ -624,6 +856,11 @@ def ensure_org_sanity(edap, source=None):
     edap.ensure_org_unit_exists(edap.TEAMS_GROUP_NAME)
     edap.ensure_org_unit_exists("people")
 
+    edap.ensure_org_unit_exists(edap.DDEA_GROUP_NAME)
+    edap.ensure_org_unit_exists(edap.CDEA_GROUP_NAME)
+    edap.ensure_org_unit_exists(edap.LM_GROUP_NAME)
+    edap.ensure_org_unit_exists(edap.SPECIAL_GROUP_NAME)
+
     edap.create_all_divisions(source.get("divisions", []))
     edap.create_all_franchises(source.get("franchises", []))
 
@@ -686,7 +923,8 @@ def update_parser(parser=None):
 
 
 class Edap(LdapObjectsMixin, LdapGroupMixin, OrganizationalUnitMixin, LdapPostfixUserMixin,
-           LdapTeamMixin, LdapFranchiseMixin, LdapDivisionMixin, LdapServiceMixin):
+           LdapTeamMixin, LdapFranchiseMixin, LdapDivisionMixin, LdapServiceMixin,LdapSpecialMixin,
+           LdapDdeaMixin, LdapCdeaMixin, LdapLmMixin):
 
     def __init__(self, hostname, admin_cn, password, domain=None):
         if domain is None:
@@ -705,11 +943,27 @@ class Edap(LdapObjectsMixin, LdapGroupMixin, OrganizationalUnitMixin, LdapPostfi
         self.DIVISIONS_OU = f"ou={self.DIVISIONS_GROUP_NAME}"
         self.DIVISIONS_GROUP = f"{self.DIVISIONS_OU},{self.BASE_DN}"
 
+        self.DDEA_GROUP_NAME = "ddea"
+        self.DDEA_OU = f"ou={self.DDEA_GROUP_NAME}"
+        self.DDEA_GROUP = f"{self.DDEA_OU},{self.BASE_DN}"
+
+        self.CDEA_GROUP_NAME = "cdea"
+        self.CDEA_OU = f"ou={self.CDEA_GROUP_NAME}"
+        self.CDEA_GROUP = f"{self.CDEA_OU},{self.BASE_DN}"
+
+        self.LM_GROUP_NAME = "lm"
+        self.LM_OU = f"ou={self.LM_GROUP_NAME}"
+        self.LM_GROUP = f"{self.LM_OU},{self.BASE_DN}"
+
+        self.SPECIAL_GROUP_NAME = "special"
+        self.SPECIAL_OU = f"ou={self.SPECIAL_GROUP_NAME}"
+        self.SPECIAL_GROUP = f"{self.SPECIAL_OU},{self.BASE_DN}"
+
         self.TEAMS_GROUP_NAME = "teams"
         self.TEAMS_OU = f"ou={self.TEAMS_GROUP_NAME}"
         self.TEAMS_GROUP = f"{self.TEAMS_OU},{self.BASE_DN}"
 
-        self.FRANCHISES_GROUP_NAME = 'franchises'
+        self.FRANCHISES_GROUP_NAME = "franchises"
         self.FRANCHISES_OU = f"ou={self.FRANCHISES_GROUP_NAME}"
         self.FRANCHISES_GROUP = f"{self.FRANCHISES_OU},{self.BASE_DN}"
 
