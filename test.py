@@ -88,20 +88,17 @@ def test_special_becomes_present(edap):
     assert not edap.org_unit_exists("special")
     edap.create_org_unit("special")
     assert edap.org_unit_exists("special")
+    edap.delete_org_unit("special")
+    assert not edap.subobject_exists_at("ou=special", "organizationalUnit", )
 
 
 def test_presidium_special_becomes_present(edap):
     description = b'presidium'
     presidium = "presidium"
-    special = "special"
-    # print("test_presidium_special_becomes_present begin:", f"cn={presidium},{edap.SPECIAL_GROUP}", "posixGroup")
-    # print("edap.object_exists_at", f"cn={presidium},{edap.SPECIAL_GROUP}", "posixGroup", "=", edap.object_exists_at(f"cn={presidium},{edap.SPECIAL_GROUP}", "posixGroup"))
     assert not edap.object_exists_at(f"cn={presidium},{edap.SPECIAL_GROUP}", "posixGroup")
     edap.create_special(presidium, display_name=presidium)
-    # print("edap.object_exists_at", f"cn={presidium},{edap.SPECIAL_GROUP}", "posixGroup", "=", edap.object_exists_at(f"cn={presidium},{edap.SPECIAL_GROUP}", "posixGroup"))
     assert edap.object_exists_at(f"cn={presidium},{edap.SPECIAL_GROUP}", "posixGroup")
     res = edap.get_special(presidium)
-    # print("edap.get_special(presidium)", res)
     assert description in res['description']
 
 
@@ -117,7 +114,6 @@ def test_it_ddea_becomes_present(edap):
     edap.create_ddea("it", display_name="it")
     assert edap.object_exists_at(f"cn=it,{edap.DDEA_GROUP}", "posixGroup")
     res = edap.get_ddea("it")
-    print("edap.get_ddea(it)", res)
     assert description in res['description']
 
 
@@ -133,7 +129,6 @@ def test_cz_cdea_becomes_present(edap):
     edap.create_cdea("cz", display_name="cz")
     assert edap.object_exists_at(f"cn=cz,{edap.CDEA_GROUP}", "posixGroup")
     res = edap.get_cdea("cz")
-    print("edap.get_cdea(cz)", res)
     assert description in res['description']
 
 
@@ -149,7 +144,6 @@ def test_cz_res_lm_becomes_present(edap):
     edap.create_lm("cz-res", display_name="cz-res")
     assert edap.object_exists_at(f"cn=cz-res,{edap.LM_GROUP}", "posixGroup")
     res = edap.get_lm("cz-res")
-    print("edap.get_cdea(cz-res)", res)
     assert description in res['description']
 
 
