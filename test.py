@@ -112,9 +112,11 @@ def test_ddea_becomes_present(edap):
 
 def test_it_ddea_becomes_present(edap):
     description = b'IT Division Director'
-    assert not edap.object_exists_at(f"cn=it,{edap.DDEA_GROUP}", "posixGroup")
+    DDEA_IT_GROUP_DN = f"cn=it,{edap.DDEA_GROUP}"
+
+    assert not edap.object_exists_at(DDEA_IT_GROUP_DN, "posixGroup")
     edap.create_ddea("it", display_name="IT Division Director")
-    assert edap.object_exists_at(f"cn=it,{edap.DDEA_GROUP}", "posixGroup")
+    assert edap.object_exists_at(DDEA_IT_GROUP_DN, "posixGroup")
     res = edap.get_ddea("it")
     assert description in res['description']
 
@@ -244,18 +246,27 @@ def test_it_division_becomes_present(edap):
 
 
 def test_new_it_guy(edap):
-    it_group_dn = f"cn=it,{edap.DIVISIONS_GROUP}"
-    assert not edap.uid_is_member_of_group(it_group_dn, "kohout")
+    IT_GROUP_DN = f"cn=it,{edap.DIVISIONS_GROUP}"
+    DDEA_IT_GROUP_DN = f"cn=it,{edap.DDEA_GROUP}"
 
-    edap.make_uid_member_of("kohout", it_group_dn)
-    assert edap.uid_is_member_of_group(it_group_dn, "kohout")
-    edap.remove_uid_member_of("kohout", it_group_dn)
-    assert not edap.uid_is_member_of_group(it_group_dn, "kohout")
+    assert not edap.uid_is_member_of_group(IT_GROUP_DN, "kohout")
+
+    edap.make_uid_member_of("kohout", IT_GROUP_DN)
+    assert edap.uid_is_member_of_group(IT_GROUP_DN, "kohout")
+    edap.remove_uid_member_of("kohout", IT_GROUP_DN)
+    assert not edap.uid_is_member_of_group(IT_GROUP_DN, "kohout")
 
     edap.make_uid_member_of_division("kohout", "it")
-    assert edap.uid_is_member_of_group(it_group_dn, "kohout")
+    assert edap.uid_is_member_of_group(IT_GROUP_DN, "kohout")
+
+    assert not edap.uid_is_member_of_group(DDEA_IT_GROUP_DN, "kohout")
+    edap.make_uid_member_of_ddea("kohout", "it")
+    assert edap.uid_is_member_of_group(DDEA_IT_GROUP_DN, "kohout")
+    edap.remove_uid_member_of_ddea("kohout", "it")
+    assert not edap.uid_is_member_of_group(DDEA_IT_GROUP_DN, "kohout")
+
     edap.remove_uid_member_of_division("kohout", "it")
-    assert not edap.uid_is_member_of_group(it_group_dn, "kohout")
+    assert not edap.uid_is_member_of_group(IT_GROUP_DN, "kohout")
     # No error should occur
     edap.remove_uid_member_of_division("kohout", "it")
 
@@ -263,7 +274,7 @@ def test_new_it_guy(edap):
         edap.make_uid_member_of_division("kohout", "ill")
 
     with pytest.raises(ConstraintError):
-        edap.make_uid_member_of("blbec", it_group_dn)
+        edap.make_uid_member_of("blbec", IT_GROUP_DN)
 
 
 def test_label_franchise(edap):

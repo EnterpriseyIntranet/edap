@@ -203,6 +203,10 @@ class LdapUserMixin(object):
         group_fqdn = f"cn={name},{self.DIVISIONS_GROUP}"
         return self.make_uid_member_of(uid, group_fqdn)
 
+    def make_uid_member_of_ddea(self, uid, name):
+        group_fqdn = f"cn={name},{self.DDEA_GROUP}"
+        return self.make_uid_member_of(uid, group_fqdn)
+
     def make_uid_member_of_service_group(self, uid, name):
         group_fqdn = f"cn={name},{self.SERVICES_GROUP}"
         return self.make_uid_member_of(uid, group_fqdn)
@@ -217,6 +221,10 @@ class LdapUserMixin(object):
         Returns:
         """
         group_fqdn = f"cn={franchise_name},{self.FRANCHISES_GROUP}"
+        return self.make_uid_member_of(uid, group_fqdn)
+
+    def make_user_member_of_cdea(self, uid, franchise_name):
+        group_fqdn = f"cn={franchise_name},{self.CDEA_GROUP}"
         return self.make_uid_member_of(uid, group_fqdn)
 
     def make_user_member_of_team(self, uid, team_machine_name):
@@ -247,12 +255,20 @@ class LdapUserMixin(object):
         group_fqdn = f"cn={name},{self.DIVISIONS_GROUP}"
         return self.remove_uid_member_of(uid, group_fqdn)
 
+    def remove_uid_member_of_ddea(self, uid, name):
+        group_fqdn = f"cn={name},{self.DDEA_GROUP}"
+        return self.remove_uid_member_of(uid, group_fqdn)
+
     def remove_uid_member_of_service_group(self, uid, name):
         group_fqdn = f"cn={name},{self.SERVICES_GROUP}"
         return self.remove_uid_member_of(uid, group_fqdn)
 
     def remove_uid_member_of_franchise(self, uid, franchise_name):
         group_fqdn = f"cn={franchise_name},{self.FRANCHISES_GROUP}"
+        return self.remove_uid_member_of(uid, group_fqdn)
+
+    def remove_uid_member_of_cdea(self, uid, franchise_name):
+        group_fqdn = f"cn={franchise_name},{self.CDEA_GROUP}"
         return self.remove_uid_member_of(uid, group_fqdn)
 
     def remove_uid_member_of_team(self, uid, team_name):
@@ -292,7 +308,6 @@ class OrganizationalUnitMixin(object):
         fqdn = f"{dn},{base}"
 
         dic = dict(
-            ou=dn.encode("ASCII"),
             objectClass=(b"organizationalUnit", b"top"),
         )
         modlist = ldap.modlist.addModlist(dic)
