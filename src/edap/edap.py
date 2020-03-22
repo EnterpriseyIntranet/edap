@@ -118,8 +118,7 @@ class LdapObjectsMixin(object):
         return self.delete_s(dn)
 
 
-class LdapUserMixin(object):
-
+class LdapUserMixin:
     def add_user(self, uid, name, surname, password, mail, picture_bytes=b""):
         if self.subobject_exists_at("ou=people", "organizationalUnit") == 0:
             raise ConstraintError(f"The people group '{self.PEOPLE_GROUP}' doesn't exist.")
@@ -171,6 +170,18 @@ class LdapUserMixin(object):
             jpegPhoto=picture_bytes,
         )
         return dic
+
+    def modify_user(self, uid, modify_dict):
+        fqdn = f"uid={uid},{self.PEOPLE_GROUP}"
+        transform = dict(
+                givenName=lambda x: x.encode("UTF-8"),
+                sn=lambda x: x.encode("UTF-8"),
+                mail=lambda x: x.encode("ASCII"),
+                jpegPhoto=lambda x: x,
+                password=lambda x: _hashPassword(x),
+        )
+        modlist = [(ldap.MOD_REPLACE, key, transform[key](val)) for key, val in modify_dict.items()]
+        self.modify_s(fqdn, modlist)
 
     def _mk_add_user_modlist(self, uid, name, surname, password, mail, picture_bytes):
         dic = self._mk_add_user_dict(uid, name, surname, password, mail, picture_bytes)
