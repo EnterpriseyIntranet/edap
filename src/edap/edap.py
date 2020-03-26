@@ -2,6 +2,7 @@ import hashlib
 import os
 import codecs
 import argparse
+import base64
 
 import ldap
 import ldap.modlist
@@ -75,6 +76,28 @@ def _hashPassword(password):
     h.update(salt)
     hashed = "{SSHA}".encode() + codecs.encode(h.digest() + salt, "base64").strip()
     return hashed
+
+
+def check_password(tagged_digest_salt, password):
+    """
+    Checks the OpenLDAP tagged digest against the given password
+    """
+    # the entire payload is base64-encoded
+    assert tagged_digest_salt.startswith('{SSHA}')
+
+    # strip off the hash label
+    digest_salt_b64 = tagged_digest_salt[6:].encode("ASCII")
+
+    # the password+salt buffer is also base64-encoded.  decode and split the
+    # digest and salt
+    digest_salt = base64.decodebytes(digest_salt_b64)
+    digest = digest_salt[:20]
+    salt = digest_salt[20:]
+
+    sha = hashlib.sha1(password.encode("UTF-8"))
+    sha.update(salt)
+
+    return digest == sha.digest()
 
 
 class LdapObjectsMixin(object):
@@ -159,6 +182,10 @@ class LdapUserMixin:
         """
         search = f"(&(memberUid={uid})(objectClass=posixGroup))"
         return transform_ldap_response(self.search_s(self.BASE_DN, ldap.SCOPE_SUBTREE, search))
+
+    def verify_user_password(self, user_dict, password):
+        existing_hashed_password = user_dict["userPassword"][0].decode("ASCII")
+        return check_password(existing_hashed_password, password)
 
     def _mk_add_user_dict(self, uid, name, surname, password, mail, picture_bytes):
         mail = mail.encode("ASCII")
