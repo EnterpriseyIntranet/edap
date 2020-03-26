@@ -183,7 +183,8 @@ class LdapUserMixin:
         search = f"(&(memberUid={uid})(objectClass=posixGroup))"
         return transform_ldap_response(self.search_s(self.BASE_DN, ldap.SCOPE_SUBTREE, search))
 
-    def verify_user_password(self, user_dict, password):
+    def verify_user_password(self, uid, password):
+        user_dict = self.get_user(uid)
         existing_hashed_password = user_dict["userPassword"][0].decode("ASCII")
         return check_password(existing_hashed_password, password)
 
@@ -205,7 +206,7 @@ class LdapUserMixin:
                 sn=lambda x: x.encode("UTF-8"),
                 mail=lambda x: x.encode("ASCII"),
                 jpegPhoto=lambda x: x,
-                password=lambda x: _hashPassword(x),
+                userPassword=lambda x: _hashPassword(x),
         )
         modlist = [(ldap.MOD_REPLACE, key, transform[key](val)) for key, val in modify_dict.items()]
         self.modify_s(fqdn, modlist)

@@ -213,10 +213,14 @@ def test_get_users(edap):
     assert len(edap.get_users(search=f"uid={user_id}")) == 0
     edap.ensure_org_unit_exists("people")
     edap.add_user(user_id, 'test', 'test', 'testPassword', "foo@bar.com")
-    user = edap.get_user(user_id)
-    assert not edap.verify_user_password(user, "lalala")
-    assert edap.verify_user_password(user, "testPassword")
-    assert user["mail"][0] == b"foo@bar.com"
+
+    assert not edap.verify_user_password(user_id, "lalala")
+    assert edap.verify_user_password(user_id, "testPassword")
+    edap.modify_user(user_id, dict(userPassword="lalala"))
+    assert not edap.verify_user_password(user_id, "testPassword")
+    assert edap.verify_user_password(user_id, "lalala")
+
+    assert edap.get_user(user_id)["mail"][0] == b"foo@bar.com"
     edap.modify_user(user_id, dict(mail="foo@bar.baz"))
     assert edap.get_user(user_id)["mail"][0] == b"foo@bar.baz"
     assert len(edap.get_users(search=f"uid={user_id}")) == 1
