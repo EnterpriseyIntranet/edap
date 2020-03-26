@@ -2,6 +2,7 @@ import hashlib
 import os
 import codecs
 import argparse
+import base64
 
 import ldap
 import ldap.modlist
@@ -77,6 +78,28 @@ def _hashPassword(password):
     return hashed
 
 
+def check_password(tagged_digest_salt, password):
+    """
+    Checks the OpenLDAP tagged digest against the given password
+    """
+    # the entire payload is base64-encoded
+    assert tagged_digest_salt.startswith('{SSHA}')
+
+    # strip off the hash label
+    digest_salt_b64 = tagged_digest_salt[6:].encode("ASCII")
+
+    # the password+salt buffer is also base64-encoded.  decode and split the
+    # digest and salt
+    digest_salt = base64.decodebytes(digest_salt_b64)
+    digest = digest_salt[:20]
+    salt = digest_salt[20:]
+
+    sha = hashlib.sha1(password.encode("UTF-8"))
+    sha.update(salt)
+
+    return digest == sha.digest()
+
+
 class LdapObjectsMixin(object):
 
     def object_exists(self, search, obj_class=None):
@@ -118,8 +141,7 @@ class LdapObjectsMixin(object):
         return self.delete_s(dn)
 
 
-class LdapUserMixin(object):
-
+class LdapUserMixin:
     def add_user(self, uid, name, surname, password, mail, picture_bytes=b""):
         if self.subobject_exists_at("ou=people", "organizationalUnit") == 0:
             raise ConstraintError(f"The people group '{self.PEOPLE_GROUP}' doesn't exist.")
@@ -161,6 +183,10 @@ class LdapUserMixin(object):
         search = f"(&(memberUid={uid})(objectClass=posixGroup))"
         return transform_ldap_response(self.search_s(self.BASE_DN, ldap.SCOPE_SUBTREE, search))
 
+    def verify_user_password(self, user_dict, password):
+        existing_hashed_password = user_dict["userPassword"][0].decode("ASCII")
+        return check_password(existing_hashed_password, password)
+
     def _mk_add_user_dict(self, uid, name, surname, password, mail, picture_bytes):
         mail = mail.encode("ASCII")
         dic = dict(
@@ -171,6 +197,18 @@ class LdapUserMixin(object):
             jpegPhoto=picture_bytes,
         )
         return dic
+
+    def modify_user(self, uid, modify_dict):
+        fqdn = f"uid={uid},{self.PEOPLE_GROUP}"
+        transform = dict(
+                givenName=lambda x: x.encode("UTF-8"),
+                sn=lambda x: x.encode("UTF-8"),
+                mail=lambda x: x.encode("ASCII"),
+                jpegPhoto=lambda x: x,
+                password=lambda x: _hashPassword(x),
+        )
+        modlist = [(ldap.MOD_REPLACE, key, transform[key](val)) for key, val in modify_dict.items()]
+        self.modify_s(fqdn, modlist)
 
     def _mk_add_user_modlist(self, uid, name, surname, password, mail, picture_bytes):
         dic = self._mk_add_user_dict(uid, name, surname, password, mail, picture_bytes)
