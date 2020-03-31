@@ -204,6 +204,7 @@ class LdapUserMixin:
         transform = dict(
                 givenName=lambda x: x.encode("UTF-8"),
                 sn=lambda x: x.encode("UTF-8"),
+                cn=lambda x: x.encode("UTF-8"),
                 mail=lambda x: x.encode("ASCII"),
                 jpegPhoto=lambda x: x,
                 userPassword=lambda x: _hashPassword(x),
