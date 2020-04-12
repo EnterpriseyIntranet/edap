@@ -142,12 +142,14 @@ class LdapObjectsMixin(object):
 
 
 class LdapUserMixin:
-    def add_user(self, uid, name, surname, password, mail, picture_bytes=b""):
+    def add_user(self, uid, name, surname, password, mail, picture_bytes=b"", mail_aliases=None):
+        if not mail_aliases:
+            mail_aliases = []
         if self.subobject_exists_at("ou=people", "organizationalUnit") == 0:
             raise ConstraintError(f"The people group '{self.PEOPLE_GROUP}' doesn't exist.")
         if self.user_of_uid_exists(uid) > 0:
             raise ConstraintError(f"User of uid '{uid}' already exists.")
-        modlist = self._mk_add_user_modlist(uid, name, surname, password, mail, picture_bytes)
+        modlist = self._mk_add_user_modlist(uid, name, surname, password, mail, picture_bytes, mail_aliases)
         self.add_s(f"uid={uid},{self.PEOPLE_GROUP}", modlist)
 
     def get_users(self, search=None):
@@ -171,6 +173,21 @@ class LdapUserMixin:
         """
         return get_single_object(self.get_users(search=f"uid={uid}"))
 
+    def get_user_as_good_dict(self, uid):
+        user_dict = self.get_user(uid)
+        transform = dict(
+                givenName=lambda x: x[0].decode("UTF-8"),
+                sn=lambda x: x[0].decode("UTF-8"),
+                cn=lambda x: x[0].decode("UTF-8"),
+                mail=lambda x: x[0].decode("ASCII"),
+                jpegPhoto=lambda x: x[0],
+                mailAlias=lambda x: [a.decode("UTF-8") for a in x],
+        )
+        res = dict()
+        for key, t in transform.items():
+            res[key] = t(user_dict.get(key, [b""]))
+        return res
+
     def get_user_groups(self, uid):
         """
         Get groups where user is a member
@@ -188,7 +205,7 @@ class LdapUserMixin:
         existing_hashed_password = user_dict["userPassword"][0].decode("ASCII")
         return check_password(existing_hashed_password, password)
 
-    def _mk_add_user_dict(self, uid, name, surname, password, mail, picture_bytes):
+    def _mk_add_user_dict(self, uid, name, surname, password, mail, picture_bytes, mail_aliases):
         mail = mail.encode("ASCII")
         dic = dict(
             uid=uid.encode("ASCII"), givenName=name.encode("UTF-8"),
@@ -196,6 +213,7 @@ class LdapUserMixin:
             sn=surname.encode("UTF-8"), userPassword=_hashPassword(password),
             cn=f"{name} {surname}".encode("UTF-8"),
             jpegPhoto=picture_bytes,
+            mailAlias=[a.encode("UTF-8") for a in mail_aliases],
         )
         return dic
 
@@ -208,12 +226,13 @@ class LdapUserMixin:
                 mail=lambda x: x.encode("ASCII"),
                 jpegPhoto=lambda x: x,
                 userPassword=lambda x: _hashPassword(x),
+                mailAlias=lambda x: [a.encode("UTF-8") for a in x],
         )
         modlist = [(ldap.MOD_REPLACE, key, transform[key](val)) for key, val in modify_dict.items()]
         self.modify_s(fqdn, modlist)
 
-    def _mk_add_user_modlist(self, uid, name, surname, password, mail, picture_bytes):
-        dic = self._mk_add_user_dict(uid, name, surname, password, mail, picture_bytes)
+    def _mk_add_user_modlist(self, uid, name, surname, password, mail, picture_bytes, mail_aliases):
+        dic = self._mk_add_user_dict(uid, name, surname, password, mail, picture_bytes, mail_aliases)
         modlist = ldap.modlist.addModlist(dic)
         return modlist
 
@@ -324,8 +343,8 @@ class LdapPostfixUserMixin(LdapUserMixin):
     MAIL_UID = 5000
     HOME_FORMAT_STR = "/var/mail/mail.cspii.org/{uid}"
 
-    def _mk_add_user_dict(self, uid, name, surname, password, mail, picture_bytes):
-        dic = super()._mk_add_user_dict(uid, name, surname, password, mail, picture_bytes)
+    def _mk_add_user_dict(self, uid, name, surname, password, mail, picture_bytes, mail_aliases):
+        dic = super()._mk_add_user_dict(uid, name, surname, password, mail, picture_bytes, mail_aliases)
         postfix_dic = dict(
             mailEnabled=b"TRUE",
             mailGidNumber=str(self.MAIL_GID).encode("ASCII"),
