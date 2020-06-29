@@ -243,6 +243,7 @@ def test_get_user_groups(edap):
     edap.make_uid_member_of(user_id, f'cn={group_name},{edap.DIVISIONS_GROUP}')
     assert len(edap.get_user_groups(user_id)) == 1
     assert edap.get_user_groups(user_id)[0]['cn'][0] == group_name.encode('utf-8')
+    assert edap.get_uids_member_of_ou(edap.DIVISIONS_GROUP_NAME) == [user_id]
 
 
 def test_user_becomes_present(edap):
@@ -277,13 +278,18 @@ def test_new_it_guy(edap):
     assert not edap.uid_is_member_of_group(DDEA_IT_GROUP_DN, "kohout")
     edap.make_uid_member_of_ddea("kohout", "it")
     assert edap.uid_is_member_of_group(DDEA_IT_GROUP_DN, "kohout")
+    assert edap.get_uids_member_of_group(edap.DIVISIONS_GROUP_NAME, "it") == ["kohout"]
     edap.remove_uid_member_of_ddea("kohout", "it")
     assert not edap.uid_is_member_of_group(DDEA_IT_GROUP_DN, "kohout")
+    assert sorted(edap.get_uids_member_of_ou(edap.DIVISIONS_GROUP_NAME)) == ["kohout", "testUserGroups"]
 
     edap.remove_uid_member_of_division("kohout", "it")
-    assert not edap.uid_is_member_of_group(IT_GROUP_DN, "kohout")
+    assert edap.get_uids_member_of_ou(edap.DIVISIONS_GROUP_NAME) == ["testUserGroups"]
+
     # No error should occur
     edap.remove_uid_member_of_division("kohout", "it")
+
+    assert edap.get_uids_member_of_ou(edap.DIVISIONS_GROUP_NAME) == ["testUserGroups"]
 
     with pytest.raises(ConstraintError):
         edap.make_uid_member_of_division("kohout", "ill")
@@ -323,7 +329,11 @@ def test_create_franchise_custom_name(edap):
     franchise = edap.get_franchise(franchise_cname)
     assert franchise['description'][0] == franchise_description.encode('utf-8')
 
+    assert len(edap.get_franchises()) == 2  # We have some from previous tests
+    assert edap.get_franchises()[0]["cn"][0].decode('utf-8') == "ua"
+
     edap.delete_franchise(franchise_cname)
+    assert len(edap.get_franchises()) == 1
 
 
 def test_corresponding_teams(edap):

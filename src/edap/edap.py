@@ -242,10 +242,39 @@ class LdapUserMixin:
         found = self.search_s(f"{self.PEOPLE_GROUP}", ldap.SCOPE_ONELEVEL, f"(uid={uid})")
         return len(found)
 
+    def _extract_attr_from_search_results(self, results, attr):
+        res = set()
+        for pairs in results:
+            for mapping in pairs[1:]:
+                if not mapping:
+                    continue
+                res.update(mapping[attr])
+        return res
+
+    def get_uids_member_of_ou(self, ou_name):
+        root = f"ou={ou_name},{self.BASE_DN}"
+        search = f"(&(objectClass=posixGroup))"
+        res = self.search_s(root, ldap.SCOPE_SUBTREE, search, attrlist=["memberUid"])
+
+        members = self._extract_attr_from_search_results(res, "memberUid")
+        return [u.decode("UTF-8") for u in members]
+
+    def get_uids_member_of_group(self, parent_ou_name, group_cn):
+        root = f"ou={parent_ou_name},{self.BASE_DN}"
+        search = f"(&(objectClass=posixGroup)(cn={group_cn}))"
+        res = self.search_s(root, ldap.SCOPE_SUBTREE, search, attrlist=["memberUid"])
+
+        members = self._extract_attr_from_search_results(res, "memberUid")
+        return [u.decode("UTF-8") for u in members]
+
     def uid_is_member_of_group(self, group_fqdn, uid):
         search = f"memberUid={uid}"
         found = self.search_s(group_fqdn, ldap.SCOPE_BASE, f"({search})")
         return len(found)
+
+    def uid_is_member_of_special_group(self, uid, name):
+        group_fqdn = f"cn={name},{self.SPECIAL_GROUP}"
+        return self.uid_is_member_of_group(group_fqdn, uid)
 
     def make_uid_member_of(self, uid, group_fqdn):
         if self.object_exists_at(group_fqdn, "posixGroup") == 0:
@@ -268,6 +297,10 @@ class LdapUserMixin:
 
     def make_uid_member_of_service_group(self, uid, name):
         group_fqdn = f"cn={name},{self.SERVICES_GROUP}"
+        return self.make_uid_member_of(uid, group_fqdn)
+
+    def make_uid_member_of_special_group(self, uid, name):
+        group_fqdn = f"cn={name},{self.SPECIAL_GROUP}"
         return self.make_uid_member_of(uid, group_fqdn)
 
     def make_user_member_of_franchise(self, uid, franchise_name):
@@ -320,6 +353,10 @@ class LdapUserMixin:
 
     def remove_uid_member_of_service_group(self, uid, name):
         group_fqdn = f"cn={name},{self.SERVICES_GROUP}"
+        return self.remove_uid_member_of(uid, group_fqdn)
+
+    def remove_uid_member_of_special_group(self, uid, name):
+        group_fqdn = f"cn={name},{self.SPECIAL_GROUP}"
         return self.remove_uid_member_of(uid, group_fqdn)
 
     def remove_uid_member_of_franchise(self, uid, franchise_name):
@@ -508,8 +545,8 @@ class LdapSpecialMixin(object):
         return self.create_group(name=machine_name, organizational_unit="special", description=display_name_bytes)
 
     def create_all_specials(self, source):
-        for dname in source:
-            self.create_special(dname)
+        for name in source:
+            self.create_special(name)
 
     def delete_special(self, machine_name):
         """
